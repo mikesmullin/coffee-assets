@@ -1,0 +1,34 @@
+{
+  "name": "coffee-assets",
+  "version": "0.0.1",
+  "description": "Sprockets syntax for aggregating/minifying/gzipping CoffeeTemplates, CoffeeStylesheets, and CoffeeSprites.",
+  "main": "js/coffee-assets.js",
+  "directories": {
+    "test": "test"
+  },
+  "scripts": {
+    "pretest": "coffee --bare -o js coffee/coffee-assets.coffee",
+    "test": "mocha --reporter spec --bail --ui bdd --colors --compilers coffee:coffee-script --require coffee-script test/test.coffee"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/mikesmullin/coffee-assets.git"
+  },
+  "keywords": [
+    "coffee",
+    "stylesheets",
+    "templates",
+    "sprites",
+    "assets",
+    "sprockets",
+    "aggregate",
+    "minify",
+    "gzip"
+  ],
+  "author": "Mike Smullin <mike@smullindesign.com>",
+  "license": "MIT",
+  "readmeFilename": "README.md",
+  "devDependencies": {
+    "chai": "~1.4.0"
+  }
+}
