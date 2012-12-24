@@ -30,5 +30,12 @@
   "readmeFilename": "README.md",
   "devDependencies": {
     "chai": "~1.4.0"
+  },
+  "dependencies": {
+    "coffee-script": "~1.4.0",
+    "coffee-templates": "0.0.2",
+    "coffee-stylesheets": "0.0.1",
+    "coffee-sprites": "0.0.1",
+    "async2": "~0.1.0"
   }
 }

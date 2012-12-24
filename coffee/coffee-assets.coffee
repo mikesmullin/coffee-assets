@@ -1,3 +1,4 @@
+async = require 'async2'
 fs = require 'fs'
 coffee = require 'coffee-script'
 CoffeeTemplates = require 'coffee-templates'
@@ -5,7 +6,7 @@ CoffeeStylesheets = require 'coffee-stylesheets'
 CoffeeSprites = require 'coffee-sprites'
 
 module.exports = class CoffeeAssets
-  aggregate: (file, cb) ->
+  @aggregate: (file, cb) ->
     fs.readFile file, 'utf8', (err, data) ->
       cb err if err
       directives = []
@@ -23,50 +24,63 @@ module.exports = class CoffeeAssets
       return
     return
 
-  precompile: (file, compile, cb), ->
+  @precompile: (file, compile, cb) ->
     s = ''
     type = (m=file.match(/\..+$/)) isnt null and m[0]
-    assets.aggregate file, (err, out) ->
+    CoffeeAssets.aggregate file, (err, out) ->
       cb err if err
+      flow = new async()
       for k of out
         if typeof out[k] is 'string'
-          s += compile type, out[k]
-        else # object
-          if out[k].directive is 'require'
-            precompile out[k].file, compile, (err, compiled) ->
+          flow.serial ->
+            done = @
+            compile type, out[k], (err, compiled) ->
               cb err if err
               s += compiled
-            piece = out
-      cb null, s
+              done err
+            return
+        else # object
+          if out[k].directive is 'require'
+            flow.serial ->
+              done = @
+              precompile out[k].file, compile, (err, compiled) ->
+                cb err if err
+                s += compiled
+                done err
+              return
+      flow.finally (err) ->
+        cb err, s
+        return
       return
     return
 
-  compiler: (o) ->
+  @compiler: (o) ->
     o = o or {}
     o.template_options = o.template_options or format: true
     o.stylesheet_options = o.stylesheet_options or format: true
 
-    (type, data) ->
+    (type, data, done) ->
       switch type
         when '.js.coffee'
-          js = coffee.eval data
-          # do i need to format the js better here?
-          return js.toString()
+          done null, coffee.compile data, bare: true
         when '.html.coffee'
-          js_fn = coffee.eval '(->'+data+')'
+          js_fn = eval '(function(){'+coffee.compile(data, bare: true)+'})'
           engine = new CoffeeTemplates o.template_options
           mustache = engine.render js_fn
           js_fn = CoffeeTemplates.compile mustache
           # do i need to format the js better here?
-          return js_fn.toString()
+          done null, js_fn.toString()
         when '.css.coffee'
-          js_fn = coffee.eval '(->'+data+')'
+          debugger
+          js_fn = eval '(function(){'+coffee.compile(data, bare: true)+'})'
           engine = new CoffeeStylesheets o.stylesheet_options
-          return engine.render data
+          engine.render js_fn, (err, css) ->
+            debugger
+            done err, css
         else # .js, .css, undefined
-          return data
+          done null, data
 
-  precompile_templates: (path, o, cb) ->
+  @precompile_templates: (path, o, cb) ->
     templates = {}
     # TODO: walk the in directory hierarchy
       # TODO: make object of coffee.eval js_fns with keys as their relative paths
@@ -80,11 +94,11 @@ module.exports = class CoffeeAssets
     # do i need to format the js better here?
     return js_fn.toString()
 
-  digest: ->
+  @digest: ->
 
-  minify: ->
+  @minify: ->
 
-  gzip: ->
+  @gzip: ->
 
-  clean: ->
+  @clean: ->
 
