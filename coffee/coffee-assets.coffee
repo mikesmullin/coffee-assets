@@ -68,31 +68,41 @@ module.exports = class CoffeeAssets
           engine = new CoffeeTemplates o.template_options
           mustache = engine.render js_fn
           js_fn = CoffeeTemplates.compile mustache
-          # do i need to format the js better here?
           done null, js_fn.toString()
         when '.css.coffee'
-          debugger
           js_fn = eval '(function(){'+coffee.compile(data, bare: true)+'})'
           engine = new CoffeeStylesheets o.stylesheet_options
           engine.render js_fn, (err, css) ->
-            debugger
             done err, css
         else # .js, .css, undefined
           done null, data
 
   @precompile_templates: (path, o, cb) ->
-    templates = {}
-    # TODO: walk the in directory hierarchy
-      # TODO: make object of coffee.eval js_fns with keys as their relative paths
-      #       without file extensions
-    # TODO: pass that object to CoffeeTemplates.compileAll and return a fn
-    # TODO: convert that js_fn toString() and write to file templates.js
-    js_fn = coffee.eval '(->'+data+')'
     engine = new CoffeeTemplates o.template_options
-    templates['views/uesrs/...'] = mustache = engine.render js_fn
-    js_fn = CoffeeTemplates.compileAll templates
-    # do i need to format the js better here?
-    return js_fn.toString()
+    templates = {}
+    walk = (base, cb, done) ->
+      items = fs.readdirSync base
+      dirs = []
+      for i, item of items
+        abspath = base+'/'+item
+        if fs.statSync(abspath).isDirectory()
+          dirs.push abspath
+          walk abspath, cb
+        else
+          cb abspath
+      done() if typeof done is 'function'
+      return dirs
+
+    walk path, ((file) -> # walk the directory hierarchy
+      if file.match(/\.html\.coffee$/) isnt null
+        key = file.substr(path.length+1, file.length-12-path.length-1)
+        data = fs.readFileSync file
+        js_fn = eval '(function(){'+coffee.compile(''+data, bare: true)+'})'
+        mustache = engine.render js_fn
+        templates[key] = CoffeeTemplates.compile mustache, false
+    ), ->
+      js_fn = CoffeeTemplates.compileAll templates
+      cb null, js_fn.toString()
 
   @digest: ->
 

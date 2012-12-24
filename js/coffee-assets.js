@@ -110,13 +110,12 @@ module.exports = CoffeeAssets = (function() {
           js_fn = CoffeeTemplates.compile(mustache);
           return done(null, js_fn.toString());
         case '.css.coffee':
-          debugger;
           js_fn = eval('(function(){' + coffee.compile(data, {
             bare: true
           }) + '})');
           engine = new CoffeeStylesheets(o.stylesheet_options);
           return engine.render(js_fn, function(err, css) {
-            debugger;            return done(err, css);
+            return done(err, css);
           });
         default:
           return done(null, data);
@@ -125,13 +124,44 @@ module.exports = CoffeeAssets = (function() {
   };
 
   CoffeeAssets.precompile_templates = function(path, o, cb) {
-    var engine, js_fn, mustache, templates;
-    templates = {};
-    js_fn = coffee["eval"]('(->' + data + ')');
+    var engine, templates, walk;
     engine = new CoffeeTemplates(o.template_options);
-    templates['views/uesrs/...'] = mustache = engine.render(js_fn);
-    js_fn = CoffeeTemplates.compileAll(templates);
-    return js_fn.toString();
+    templates = {};
+    walk = function(base, cb, done) {
+      var abspath, dirs, i, item, items;
+      items = fs.readdirSync(base);
+      dirs = [];
+      for (i in items) {
+        item = items[i];
+        abspath = base + '/' + item;
+        if (fs.statSync(abspath).isDirectory()) {
+          dirs.push(abspath);
+          walk(abspath, cb);
+        } else {
+          cb(abspath);
+        }
+      }
+      if (typeof done === 'function') {
+        done();
+      }
+      return dirs;
+    };
+    return walk(path, (function(file) {
+      var data, js_fn, key, mustache;
+      if (file.match(/\.html\.coffee$/) !== null) {
+        key = file.substr(path.length + 1, file.length - 12 - path.length - 1);
+        data = fs.readFileSync(file);
+        js_fn = eval('(function(){' + coffee.compile('' + data, {
+          bare: true
+        }) + '})');
+        mustache = engine.render(js_fn);
+        return templates[key] = CoffeeTemplates.compile(mustache, false);
+      }
+    }), function() {
+      var js_fn;
+      js_fn = CoffeeTemplates.compileAll(templates);
+      return cb(null, js_fn.toString());
+    });
   };
 
   CoffeeAssets.digest = function() {};
