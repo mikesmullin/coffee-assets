@@ -76,6 +76,8 @@ module.exports = class CoffeeAssets
         when '.css.coffee'
           js_fn = eval '(function(){'+coffee.compile(data, bare: true)+'})'
           engine = new CoffeeStylesheets o.stylesheet_options
+          if o.sprite_options
+            engine.use new CoffeeSprites o.sprite_options
           engine.render js_fn, (err, css) ->
             done err, css
         else # .js, .css, undefined

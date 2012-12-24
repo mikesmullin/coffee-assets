@@ -125,6 +125,9 @@ module.exports = CoffeeAssets = (function() {
             bare: true
           }) + '})');
           engine = new CoffeeStylesheets(o.stylesheet_options);
+          if (o.sprite_options) {
+            engine.use(new CoffeeSprites(o.sprite_options));
+          }
           return engine.render(js_fn, function(err, css) {
             return done(err, css);
           });
