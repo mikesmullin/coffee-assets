@@ -45,6 +45,7 @@ module.exports = class CoffeeAssets
     (type, data) ->
       switch type
         when '.js.coffee'
+          # do i need to accept --bare option here?
           return ''+coffee.eval data
         when '.html.coffee'
           engine = new CoffeeTemplates o.template_options
