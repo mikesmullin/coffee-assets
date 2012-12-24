@@ -1,4 +1,8 @@
 fs = require 'fs'
+coffee = require 'coffee-script'
+CoffeeTemplates = require 'coffee-templates'
+CoffeeStylesheets = require 'coffee-stylesheets'
+CoffeeSprites = require 'coffee-sprites'
 
 module.exports = class CoffeeAssets
   aggregate: (file, cb) ->
@@ -61,6 +65,20 @@ module.exports = class CoffeeAssets
           return engine.render data
         else # .js, .css, undefined
           return data
+
+  precompile_templates: (path, o, cb) ->
+    templates = {}
+    # TODO: walk the in directory hierarchy
+      # TODO: make object of coffee.eval js_fns with keys as their relative paths
+      #       without file extensions
+    # TODO: pass that object to CoffeeTemplates.compileAll and return a fn
+    # TODO: convert that js_fn toString() and write to file templates.js
+    js_fn = coffee.eval '(->'+data+')'
+    engine = new CoffeeTemplates o.template_options
+    templates['views/uesrs/...'] = mustache = engine.render js_fn
+    js_fn = CoffeeTemplates.compileAll templates
+    # do i need to format the js better here?
+    return js_fn.toString()
 
   digest: ->
 
