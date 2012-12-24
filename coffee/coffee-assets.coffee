@@ -1,5 +1,6 @@
 async = require 'async2'
 fs = require 'fs'
+path = require 'path'
 coffee = require 'coffee-script'
 CoffeeTemplates = require 'coffee-templates'
 CoffeeStylesheets = require 'coffee-stylesheets'
@@ -26,28 +27,30 @@ module.exports = class CoffeeAssets
 
   @precompile: (file, compile, cb) ->
     s = ''
-    type = (m=file.match(/\..+$/)) isnt null and m[0]
     CoffeeAssets.aggregate file, (err, out) ->
       cb err if err
       flow = new async()
       for k of out
         if typeof out[k] is 'string'
-          flow.serial ->
+          ((data) -> flow.serial ->
             done = @
-            compile type, out[k], (err, compiled) ->
+            type = (m=file.match(/\..+$/)) isnt null and m[0]
+            compile type, data, (err, compiled) ->
               cb err if err
               s += compiled
               done err
             return
+          )(out[k])
         else # object
           if out[k].directive is 'require'
-            flow.serial ->
+            ((file2) -> flow.serial ->
               done = @
-              precompile out[k].file, compile, (err, compiled) ->
+              CoffeeAssets.precompile file2, compile, (err, compiled) ->
                 cb err if err
                 s += compiled
                 done err
               return
+            )(path.resolve(path.dirname(file), out[k].file))
       flow.finally (err) ->
         cb err, s
         return
