@@ -20,37 +20,41 @@ module.exports = CoffeeAssets = (function() {
   function CoffeeAssets() {}
 
   CoffeeAssets.aggregate = function(file, cb) {
-    fs.readFile(file, 'utf8', function(err, data) {
-      var directives, lx;
-      if (err) {
-        cb(err);
+    fs.exists(file, function(exists) {
+      if (!exists) {
+        return cb("" + file + " does not exist.");
       }
-      directives = [];
-      lx = 0;
-      data = data.replace(/^(#|\/\/|\/\*)= *(require) *([\w\d\-.\/\\]+) *(\*\/)?$/gm, function() {
-        var a;
-        a = arguments;
-        directives.push(data.substr(lx, a[5] - lx));
-        directives.push({
-          directive: a[2],
-          file: a[3]
+      fs.readFile(file, 'utf8', function(err, data) {
+        var directives, lx;
+        if (err) {
+          return cb(err);
+        }
+        directives = [];
+        lx = 0;
+        data = data.replace(/^(#|\/\/|\/\*)= *(require) *([\w\d\-.\/\\]+) *(\*\/)?$/gm, function() {
+          var a;
+          a = arguments;
+          directives.push(data.substr(lx, a[5] - lx));
+          directives.push({
+            directive: a[2],
+            file: a[3]
+          });
+          lx = a[5] + a[0].length;
+          return a[0];
         });
-        lx = a[5] + a[0].length;
-        return a[0];
+        directives.push(data.substr(lx, data.length - lx));
+        return cb(null, directives);
       });
-      directives.push(data.substr(lx, data.length - lx));
-      cb(null, directives);
     });
   };
 
   CoffeeAssets.precompile = function(file, compile, cb) {
     var s;
     s = '';
-    debugger;
     CoffeeAssets.aggregate(file, function(err, out) {
       var flow, k;
       if (err) {
-        cb(err);
+        return cb(err);
       }
       flow = new async();
       for (k in out) {
@@ -62,7 +66,7 @@ module.exports = CoffeeAssets = (function() {
               type = (m = file.match(/\..+$/)) !== null && m[0];
               compile(type, data, function(err, compiled) {
                 if (err) {
-                  cb(err);
+                  return cb(err);
                 }
                 s += compiled;
                 return done(err);
@@ -77,7 +81,7 @@ module.exports = CoffeeAssets = (function() {
                 done = this;
                 CoffeeAssets.precompile(file2, compile, function(err, compiled) {
                   if (err) {
-                    cb(err);
+                    return cb(err);
                   }
                   s += compiled;
                   return done(err);
@@ -88,7 +92,7 @@ module.exports = CoffeeAssets = (function() {
         }
       }
       flow["finally"](function(err) {
-        cb(err, s);
+        return cb(err, s);
       });
     });
   };

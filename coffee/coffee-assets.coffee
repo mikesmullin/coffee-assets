@@ -8,27 +8,29 @@ CoffeeSprites = require 'coffee-sprites'
 
 module.exports = class CoffeeAssets
   @aggregate: (file, cb) ->
-    fs.readFile file, 'utf8', (err, data) ->
-      cb err if err
-      directives = []
-      lx=0
-      data = data.replace `/^(#|\/\/|\/\*)= *(require) *([\w\d\-.\/\\]+) *(\*\/)?$/gm`, ->
-        a=arguments
-        directives.push data.substr lx, a[5]-lx # contents before
-        directives.push # a directive to be processed later
-          directive: a[2]
-          file: a[3]
-        lx = a[5]+a[0].length # move cursor after token
-        return a[0]
-      directives.push data.substr lx, data.length-lx # contents after
-      cb null, directives
+    fs.exists file, (exists) ->
+      return cb "#{file} does not exist." unless exists
+      fs.readFile file, 'utf8', (err, data) ->
+        return cb err if err
+        directives = []
+        lx=0
+        data = data.replace `/^(#|\/\/|\/\*)= *(require) *([\w\d\-.\/\\]+) *(\*\/)?$/gm`, ->
+          a=arguments
+          directives.push data.substr lx, a[5]-lx # contents before
+          directives.push # a directive to be processed later
+            directive: a[2]
+            file: a[3]
+          lx = a[5]+a[0].length # move cursor after token
+          return a[0]
+        directives.push data.substr lx, data.length-lx # contents after
+        return cb null, directives
       return
     return
 
   @precompile: (file, compile, cb) ->
     s = ''
     CoffeeAssets.aggregate file, (err, out) ->
-      cb err if err
+      return cb err if err
       flow = new async()
       for k of out
         if typeof out[k] is 'string'
@@ -36,7 +38,7 @@ module.exports = class CoffeeAssets
             done = @
             type = (m=file.match(/\..+$/)) isnt null and m[0]
             compile type, data, (err, compiled) ->
-              cb err if err
+              return cb err if err
               s += compiled
               done err
             return
@@ -46,14 +48,13 @@ module.exports = class CoffeeAssets
             ((file2) -> flow.serial ->
               done = @
               CoffeeAssets.precompile file2, compile, (err, compiled) ->
-                cb err if err
+                return cb err if err
                 s += compiled
                 done err
               return
             )(path.resolve(path.dirname(file), out[k].file))
       flow.finally (err) ->
-        cb err, s
-        return
+        return cb err, s
       return
     return
 
@@ -105,7 +106,7 @@ module.exports = class CoffeeAssets
         templates[key] = CoffeeTemplates.compile mustache, false
     ), ->
       js_fn = CoffeeTemplates.compileAll templates
-      cb null, js_fn.toString()
+      return cb null, js_fn.toString()
 
   @digest: ->
 
