@@ -45,17 +45,19 @@ module.exports = class CoffeeAssets
     (type, data) ->
       switch type
         when '.js.coffee'
-          # do i need to accept --bare option here?
-          return ''+coffee.eval data
+          js = coffee.eval data
+          # do i need to format the js better here?
+          return js.toString()
         when '.html.coffee'
+          js_fn = coffee.eval '(->'+data+')'
           engine = new CoffeeTemplates o.template_options
-          data = coffee.eval data
-          data = engine.render data
-          # do i want to compile down to .js functions?
-          return ''+engine.compile data
+          mustache = engine.render js_fn
+          js_fn = CoffeeTemplates.compile mustache
+          # do i need to format the js better here?
+          return js_fn.toString()
         when '.css.coffee'
+          js_fn = coffee.eval '(->'+data+')'
           engine = new CoffeeStylesheets o.stylesheet_options
-          data = coffee.eval data
           return engine.render data
         else # .js, .css, undefined
           return data
