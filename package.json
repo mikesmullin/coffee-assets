@@ -1,6 +1,6 @@
 {
   "name": "coffee-assets",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Sprockets syntax for aggregating/minifying/gzipping CoffeeTemplates, CoffeeStylesheets, and CoffeeSprites.",
   "main": "js/coffee-assets.js",
   "directories": {
@@ -32,10 +32,10 @@
     "chai": "~1.4.0"
   },
   "dependencies": {
-    "coffee-script": "~1.4.0",
-    "coffee-templates": "0.0.2",
-    "coffee-stylesheets": "0.0.1",
-    "coffee-sprites": "0.0.1",
-    "async2": "~0.1.0"
+    "coffee-script": ">=1.4.0",
+    "coffee-templates": ">=0.0.1",
+    "coffee-stylesheets": ">=0.0.1",
+    "coffee-sprites": ">=0.0.1",
+    "async2": ">=0.0.1"
   }
 }
