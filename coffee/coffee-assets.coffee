@@ -107,7 +107,7 @@ module.exports = class CoffeeAssets
         mustache = engine.render js_fn
         templates[key] = CoffeeTemplates.compile mustache, false
     ), ->
-      js_fn = CoffeeTemplates.compileAll templates
+      js_fn = CoffeeTemplates.compileAll templates, o.template_options
       return cb null, js_fn.toString()
 
   @digest: ->
