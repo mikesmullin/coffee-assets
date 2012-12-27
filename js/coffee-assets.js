@@ -137,7 +137,7 @@ module.exports = CoffeeAssets = (function() {
     };
   };
 
-  CoffeeAssets.precompile_templates = function(path, o, cb) {
+  CoffeeAssets.precompile_templates = function(base, o, cb) {
     var engine, templates, walk;
     engine = new CoffeeTemplates(o.template_options);
     templates = {};
@@ -160,10 +160,10 @@ module.exports = CoffeeAssets = (function() {
       }
       return dirs;
     };
-    return walk(path, (function(file) {
+    return walk(base, (function(file) {
       var data, js_fn, key, mustache;
       if (file.match(/\.html\.coffee$/) !== null) {
-        key = file.substr(path.length + 1, file.length - 12 - path.length - 1);
+        key = path.resolve(file).slice(path.resolve(base, '..').length + 1, -12);
         data = fs.readFileSync(file);
         js_fn = eval('(function(){' + coffee.compile('' + data, {
           bare: true

@@ -83,7 +83,7 @@ module.exports = class CoffeeAssets
         else # .js, .css, undefined
           done null, data
 
-  @precompile_templates: (path, o, cb) ->
+  @precompile_templates: (base, o, cb) ->
     engine = new CoffeeTemplates o.template_options
     templates = {}
     walk = (base, cb, done) ->
@@ -99,9 +99,9 @@ module.exports = class CoffeeAssets
       done() if typeof done is 'function'
       return dirs
 
-    walk path, ((file) -> # walk the directory hierarchy
+    walk base, ((file) -> # walk the directory hierarchy
       if file.match(/\.html\.coffee$/) isnt null
-        key = file.substr(path.length+1, file.length-12-path.length-1)
+        key = path.resolve(file).slice(path.resolve(base, '..').length+1, -12)
         data = fs.readFileSync file
         js_fn = eval '(function(){'+coffee.compile(''+data, bare: true)+'})'
         mustache = engine.render js_fn
