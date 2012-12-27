@@ -99,10 +99,7 @@ module.exports = CoffeeAssets = (function() {
 
   CoffeeAssets.compiler = function(o) {
     o = o || {};
-    o.template_options = o.template_options || {
-      format: true
-    };
-    o.stylesheet_options = o.stylesheet_options || {
+    o.render_options = o.render_options || {
       format: true
     };
     return function(type, data, done) {
@@ -116,7 +113,7 @@ module.exports = CoffeeAssets = (function() {
           js_fn = eval('(function(){' + coffee.compile(data, {
             bare: true
           }) + '})');
-          engine = new CoffeeTemplates(o.template_options);
+          engine = new CoffeeTemplates(o.render_options);
           mustache = engine.render(js_fn);
           js_fn = CoffeeTemplates.compile(mustache);
           return done(null, js_fn.toString());
@@ -124,7 +121,7 @@ module.exports = CoffeeAssets = (function() {
           js_fn = eval('(function(){' + coffee.compile(data, {
             bare: true
           }) + '})');
-          engine = new CoffeeStylesheets(o.stylesheet_options);
+          engine = new CoffeeStylesheets(o.render_options);
           if (o.sprite_options) {
             engine.use(new CoffeeSprites(o.sprite_options));
           }
@@ -137,17 +134,17 @@ module.exports = CoffeeAssets = (function() {
     };
   };
 
-  CoffeeAssets.precompile_templates = function(base, o, cb) {
+  CoffeeAssets.precompile_all = function(basepath, o, cb) {
     var engine, templates, walk;
-    engine = new CoffeeTemplates(o.template_options);
+    engine = new CoffeeTemplates(o.render_options);
     templates = {};
-    walk = function(base, cb, done) {
+    walk = function(basepath, cb, done) {
       var abspath, dirs, i, item, items;
-      items = fs.readdirSync(base);
+      items = fs.readdirSync(basepath);
       dirs = [];
       for (i in items) {
         item = items[i];
-        abspath = base + '/' + item;
+        abspath = basepath + '/' + item;
         if (fs.statSync(abspath).isDirectory()) {
           dirs.push(abspath);
           walk(abspath, cb);
@@ -160,10 +157,10 @@ module.exports = CoffeeAssets = (function() {
       }
       return dirs;
     };
-    return walk(base, (function(file) {
+    return walk(basepath, (function(file) {
       var data, js_fn, key, mustache;
       if (file.match(/\.html\.coffee$/) !== null) {
-        key = path.resolve(file).slice(path.resolve(base, '..').length + 1, -12);
+        key = path.resolve(file).slice(path.resolve(basepath, '..').length + 1, -12);
         data = fs.readFileSync(file);
         js_fn = eval('(function(){' + coffee.compile('' + data, {
           bare: true
@@ -173,7 +170,7 @@ module.exports = CoffeeAssets = (function() {
       }
     }), function() {
       var js_fn;
-      js_fn = CoffeeTemplates.compileAll(templates, o.template_options);
+      js_fn = CoffeeTemplates.compileAll(templates, o.compile_options);
       return cb(null, js_fn.toString());
     });
   };

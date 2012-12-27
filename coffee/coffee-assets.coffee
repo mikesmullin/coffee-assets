@@ -60,8 +60,7 @@ module.exports = class CoffeeAssets
 
   @compiler: (o) ->
     o = o or {}
-    o.template_options = o.template_options or format: true
-    o.stylesheet_options = o.stylesheet_options or format: true
+    o.render_options = o.render_options or format: true
 
     (type, data, done) ->
       switch type
@@ -69,13 +68,13 @@ module.exports = class CoffeeAssets
           done null, coffee.compile data, bare: true
         when '.html.coffee'
           js_fn = eval '(function(){'+coffee.compile(data, bare: true)+'})'
-          engine = new CoffeeTemplates o.template_options
+          engine = new CoffeeTemplates o.render_options
           mustache = engine.render js_fn
           js_fn = CoffeeTemplates.compile mustache
           done null, js_fn.toString()
         when '.css.coffee'
           js_fn = eval '(function(){'+coffee.compile(data, bare: true)+'})'
-          engine = new CoffeeStylesheets o.stylesheet_options
+          engine = new CoffeeStylesheets o.render_options
           if o.sprite_options
             engine.use new CoffeeSprites o.sprite_options
           engine.render js_fn, (err, css) ->
@@ -83,14 +82,15 @@ module.exports = class CoffeeAssets
         else # .js, .css, undefined
           done null, data
 
-  @precompile_templates: (base, o, cb) ->
-    engine = new CoffeeTemplates o.template_options
+  # currently only used for templates
+  @precompile_all: (basepath, o, cb) ->
+    engine = new CoffeeTemplates o.render_options
     templates = {}
-    walk = (base, cb, done) ->
-      items = fs.readdirSync base
+    walk = (basepath, cb, done) ->
+      items = fs.readdirSync basepath
       dirs = []
       for i, item of items
-        abspath = base+'/'+item
+        abspath = basepath+'/'+item
         if fs.statSync(abspath).isDirectory()
           dirs.push abspath
           walk abspath, cb
@@ -99,15 +99,15 @@ module.exports = class CoffeeAssets
       done() if typeof done is 'function'
       return dirs
 
-    walk base, ((file) -> # walk the directory hierarchy
+    walk basepath, ((file) -> # walk the directory hierarchy
       if file.match(/\.html\.coffee$/) isnt null
-        key = path.resolve(file).slice(path.resolve(base, '..').length+1, -12)
+        key = path.resolve(file).slice(path.resolve(basepath, '..').length+1, -12)
         data = fs.readFileSync file
         js_fn = eval '(function(){'+coffee.compile(''+data, bare: true)+'})'
         mustache = engine.render js_fn
         templates[key] = CoffeeTemplates.compile mustache, false
     ), ->
-      js_fn = CoffeeTemplates.compileAll templates, o.template_options
+      js_fn = CoffeeTemplates.compileAll templates, o.compile_options
       return cb null, js_fn.toString()
 
   @digest: ->
