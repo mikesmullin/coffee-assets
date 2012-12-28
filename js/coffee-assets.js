@@ -28,17 +28,17 @@ module.exports = CoffeeAssets = (function() {
       if (!exists) {
         return cb("" + file + " does not exist.");
       }
-      fs.readFile(file, 'utf8', function(err, data) {
+      fs.readFile(file, 'utf8', function(err, code) {
         var directives, lx;
         if (err) {
           return cb(err);
         }
         directives = [];
         lx = 0;
-        data = data.replace(/^(#|\/\/|\/\*)= *(require) *([\w\d\-.\/\\]+) *(\*\/)?$/gm, function() {
+        code = code.replace(/^(#|\/\/|\/\*)= *(require) *([\w\d\-.\/\\]+) *(\*\/)?$/gm, function() {
           var a;
           a = arguments;
-          directives.push(data.substr(lx, a[5] - lx));
+          directives.push(code.substr(lx, a[5] - lx));
           directives.push({
             directive: a[2],
             file: a[3]
@@ -46,7 +46,7 @@ module.exports = CoffeeAssets = (function() {
           lx = a[5] + a[0].length;
           return a[0];
         });
-        directives.push(data.substr(lx, data.length - lx));
+        directives.push(code.substr(lx, code.length - lx));
         return cb(null, directives);
       });
     });
@@ -67,9 +67,9 @@ module.exports = CoffeeAssets = (function() {
       flow = new async();
       for (k in out) {
         if (typeof out[k] === 'string') {
-          (function(data) {
+          (function(code) {
             return flow.serial(function() {
-              s += CoffeeAssets.escape_literal(type, data);
+              s += CoffeeAssets.escape_literal(type, code);
               this();
             });
           })(out[k]);
@@ -104,18 +104,18 @@ module.exports = CoffeeAssets = (function() {
     });
   };
 
-  CoffeeAssets.escape_literal = function(type, data) {
+  CoffeeAssets.escape_literal = function(type, code) {
     switch (type) {
       case '.js.coffee':
       case '.css.coffee':
       case '.html.coffee':
-        return data;
+        return code;
       case '.js':
-        return "\n`\n" + (data.replace('`', '\\`')) + "\n`\n";
+        return "\n`\n" + (code.replace('`', '\\`')) + "\n`\n";
       case '.css':
-        return "\nliteral " + (JSON.stringify(data)) + "\n";
+        return "\nliteral " + (JSON.stringify(code)) + "\n";
       case '.html':
-        return "\nliteral " + (JSON.stringify(data)) + "\n";
+        return "\nliteral " + (JSON.stringify(code)) + "\n";
     }
   };
 
@@ -124,16 +124,16 @@ module.exports = CoffeeAssets = (function() {
     o.render_options = o.render_options || {
       format: true
     };
-    return function(type, data, done) {
-      var engine, js_fn, mustache;
+    return function(type, code, done) {
+      var engine, js_fn, m, mustache;
       try {
         switch (type) {
           case '.js.coffee':
-            return done(null, CoffeeScript.compile(data, {
+            return done(null, CoffeeScript.compile(code, {
               bare: true
             }));
           case '.html.coffee':
-            js_fn = eval('(function(){' + CoffeeScript.compile(data, {
+            js_fn = eval('(function(){' + CoffeeScript.compile(code, {
               bare: true
             }) + '})');
             engine = new CoffeeTemplates(o.render_options);
@@ -141,7 +141,7 @@ module.exports = CoffeeAssets = (function() {
             js_fn = CoffeeTemplates.compile(mustache);
             return done(null, js_fn.toString());
           case '.css.coffee':
-            js_fn = eval('(function(){' + CoffeeScript.compile(data, {
+            js_fn = eval('(function(){' + CoffeeScript.compile(code, {
               bare: true
             }) + '})');
             engine = new CoffeeStylesheets(o.render_options);
@@ -152,12 +152,34 @@ module.exports = CoffeeAssets = (function() {
               return done(err, css);
             });
           default:
-            return done(null, data);
+            return done(null, code);
         }
       } catch (err) {
+        err.lineNumber = err.lineNumber || (m = err.message.match(/ on line (\d+)/)) !== null && m[1];
+        if (err.lineNumber) {
+          err.message += CoffeeAssets.excerpt(code, err.lineNumber, 5);
+        }
         return done(err);
       }
     };
+  };
+
+  CoffeeAssets.excerpt = function(code, lineNumber, grab) {
+    var digits, format, i, lines, ln, start;
+    if (grab == null) {
+      grab = 5;
+    }
+    start = lineNumber - (Math.floor(grab / 2) + 1);
+    lines = code.split("\n");
+    lines.splice(0, Math.max(0, start));
+    lines = lines.slice(0, grab);
+    digits = (start + grab).toString().length;
+    format = (new Array(digits + 1)).join('0');
+    for (i in lines) {
+      ln = (format + (start + parseInt(i, 10) + 1)).substr(digits * -1);
+      lines[i] = ln + ' ' + lines[i];
+    }
+    return "\n\n" + lines.join("\n") + "\n";
   };
 
   CoffeeAssets.precompile_all = function(basepath, o, cb) {
@@ -184,11 +206,11 @@ module.exports = CoffeeAssets = (function() {
       return dirs;
     };
     return walk(basepath, (function(file) {
-      var data, js_fn, key, mustache;
+      var code, js_fn, key, mustache;
       if (file.match(/\.html\.coffee$/) !== null) {
         key = path.resolve(file).slice(path.resolve(basepath, '..').length + 1, -12);
-        data = fs.readFileSync(file);
-        js_fn = eval('(function(){' + CoffeeScript.compile('' + data, {
+        code = fs.readFileSync(file);
+        js_fn = eval('(function(){' + CoffeeScript.compile('' + code, {
           bare: true
         }) + '})');
         mustache = engine.render(js_fn);

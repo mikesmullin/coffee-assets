@@ -13,19 +13,19 @@ module.exports = class CoffeeAssets
   @aggregate: (file, cb) ->
     fs.exists file, (exists) ->
       return cb "#{file} does not exist." unless exists
-      fs.readFile file, 'utf8', (err, data) ->
+      fs.readFile file, 'utf8', (err, code) ->
         return cb err if err
         directives = []
         lx=0
-        data = data.replace `/^(#|\/\/|\/\*)= *(require) *([\w\d\-.\/\\]+) *(\*\/)?$/gm`, ->
+        code = code.replace `/^(#|\/\/|\/\*)= *(require) *([\w\d\-.\/\\]+) *(\*\/)?$/gm`, ->
           a=arguments
-          directives.push data.substr lx, a[5]-lx # contents before
+          directives.push code.substr lx, a[5]-lx # contents before
           directives.push # a directive to be processed later
             directive: a[2]
             file: a[3]
           lx = a[5]+a[0].length # move cursor after token
           return a[0]
-        directives.push data.substr lx, data.length-lx # contents after
+        directives.push code.substr lx, code.length-lx # contents after
         return cb null, directives
       return
     return
@@ -38,8 +38,8 @@ module.exports = class CoffeeAssets
       flow = new async()
       for k of out
         if typeof out[k] is 'string'
-          ((data) -> flow.serial ->
-            s += CoffeeAssets.escape_literal type, data
+          ((code) -> flow.serial ->
+            s += CoffeeAssets.escape_literal type, code
             @()
             return
           )(out[k])
@@ -65,43 +65,57 @@ module.exports = class CoffeeAssets
       return
     return
 
-  @escape_literal: (type, data) ->
+  @escape_literal: (type, code) ->
     switch type
       when '.js.coffee', '.css.coffee', '.html.coffee'
-        return data # as-is
+        return code # as-is
       when '.js'
-        return "\n`\n#{data.replace('`','\\`')}\n`\n" # escaped in CoffeeScript
+        return "\n`\n#{code.replace('`','\\`')}\n`\n" # escaped in CoffeeScript
       when '.css'
-        return "\nliteral #{JSON.stringify(data)}\n" # escaped in CoffeeStylesheets
+        return "\nliteral #{JSON.stringify(code)}\n" # escaped in CoffeeStylesheets
       when '.html'
-        return "\nliteral #{JSON.stringify(data)}\n" # escaped in CoffeeTemplates
+        return "\nliteral #{JSON.stringify(code)}\n" # escaped in CoffeeTemplates
 
   @compiler: (o) ->
     o = o or {}
     o.render_options = o.render_options or format: true
 
-    (type, data, done) ->
+    (type, code, done) ->
       try
         switch type
           when '.js.coffee'
-            done null, CoffeeScript.compile data, bare: true
+            done null, CoffeeScript.compile code, bare: true
           when '.html.coffee'
-            js_fn = eval '(function(){'+CoffeeScript.compile(data, bare: true)+'})'
+            js_fn = eval '(function(){'+CoffeeScript.compile(code, bare: true)+'})'
             engine = new CoffeeTemplates o.render_options
             mustache = engine.render js_fn
             js_fn = CoffeeTemplates.compile mustache
             done null, js_fn.toString()
           when '.css.coffee'
-            js_fn = eval '(function(){'+CoffeeScript.compile(data, bare: true)+'})'
+            js_fn = eval '(function(){'+CoffeeScript.compile(code, bare: true)+'})'
             engine = new CoffeeStylesheets o.render_options
             if o.sprite_options
               engine.use new CoffeeSprites o.sprite_options
             engine.render js_fn, (err, css) ->
               done err, css
           else # .js, .css, undefined
-            done null, data
+            done null, code
       catch err
+        err.lineNumber = err.lineNumber or (m=err.message.match(`/ on line (\d+)/`)) isnt null and m[1]
+        err.message += CoffeeAssets.excerpt code, err.lineNumber, 5 if err.lineNumber
         done err
+
+  @excerpt: (code, lineNumber, grab=5) ->
+    start = lineNumber-(Math.floor(grab/2)+1)
+    lines = code.split("\n")
+    lines.splice(0, Math.max(0, start))
+    lines = lines.slice(0,grab)
+    digits = (start+grab).toString().length
+    format = (new Array(digits+1)).join('0')
+    for i of lines
+      ln = (format+(start+parseInt(i,10)+1)).substr(digits*-1)
+      lines[i] = ln+' '+lines[i]
+    return "\n\n"+lines.join("\n")+"\n"
 
   # currently only used for templates
   @precompile_all: (basepath, o, cb) ->
@@ -123,8 +137,8 @@ module.exports = class CoffeeAssets
     walk basepath, ((file) -> # walk the directory hierarchy
       if file.match(/\.html\.coffee$/) isnt null
         key = path.resolve(file).slice(path.resolve(basepath, '..').length+1, -12)
-        data = fs.readFileSync file
-        js_fn = eval '(function(){'+CoffeeScript.compile(''+data, bare: true)+'})'
+        code = fs.readFileSync file
+        js_fn = eval '(function(){'+CoffeeScript.compile(''+code, bare: true)+'})'
         mustache = engine.render js_fn
         templates[key] = CoffeeTemplates.compile mustache, false
     ), ->
