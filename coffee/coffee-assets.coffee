@@ -81,24 +81,27 @@ module.exports = class CoffeeAssets
     o.render_options = o.render_options or format: true
 
     (type, data, done) ->
-      switch type
-        when '.js.coffee'
-          done null, CoffeeScript.compile data, bare: true
-        when '.html.coffee'
-          js_fn = eval '(function(){'+CoffeeScript.compile(data, bare: true)+'})'
-          engine = new CoffeeTemplates o.render_options
-          mustache = engine.render js_fn
-          js_fn = CoffeeTemplates.compile mustache
-          done null, js_fn.toString()
-        when '.css.coffee'
-          js_fn = eval '(function(){'+CoffeeScript.compile(data, bare: true)+'})'
-          engine = new CoffeeStylesheets o.render_options
-          if o.sprite_options
-            engine.use new CoffeeSprites o.sprite_options
-          engine.render js_fn, (err, css) ->
-            done err, css
-        else # .js, .css, undefined
-          done null, data
+      try
+        switch type
+          when '.js.coffee'
+            done null, CoffeeScript.compile data, bare: true
+          when '.html.coffee'
+            js_fn = eval '(function(){'+CoffeeScript.compile(data, bare: true)+'})'
+            engine = new CoffeeTemplates o.render_options
+            mustache = engine.render js_fn
+            js_fn = CoffeeTemplates.compile mustache
+            done null, js_fn.toString()
+          when '.css.coffee'
+            js_fn = eval '(function(){'+CoffeeScript.compile(data, bare: true)+'})'
+            engine = new CoffeeStylesheets o.render_options
+            if o.sprite_options
+              engine.use new CoffeeSprites o.sprite_options
+            engine.render js_fn, (err, css) ->
+              done err, css
+          else # .js, .css, undefined
+            done null, data
+      catch err
+        done err
 
   # currently only used for templates
   @precompile_all: (basepath, o, cb) ->

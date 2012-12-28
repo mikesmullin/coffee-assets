@@ -126,32 +126,36 @@ module.exports = CoffeeAssets = (function() {
     };
     return function(type, data, done) {
       var engine, js_fn, mustache;
-      switch (type) {
-        case '.js.coffee':
-          return done(null, CoffeeScript.compile(data, {
-            bare: true
-          }));
-        case '.html.coffee':
-          js_fn = eval('(function(){' + CoffeeScript.compile(data, {
-            bare: true
-          }) + '})');
-          engine = new CoffeeTemplates(o.render_options);
-          mustache = engine.render(js_fn);
-          js_fn = CoffeeTemplates.compile(mustache);
-          return done(null, js_fn.toString());
-        case '.css.coffee':
-          js_fn = eval('(function(){' + CoffeeScript.compile(data, {
-            bare: true
-          }) + '})');
-          engine = new CoffeeStylesheets(o.render_options);
-          if (o.sprite_options) {
-            engine.use(new CoffeeSprites(o.sprite_options));
-          }
-          return engine.render(js_fn, function(err, css) {
-            return done(err, css);
-          });
-        default:
-          return done(null, data);
+      try {
+        switch (type) {
+          case '.js.coffee':
+            return done(null, CoffeeScript.compile(data, {
+              bare: true
+            }));
+          case '.html.coffee':
+            js_fn = eval('(function(){' + CoffeeScript.compile(data, {
+              bare: true
+            }) + '})');
+            engine = new CoffeeTemplates(o.render_options);
+            mustache = engine.render(js_fn);
+            js_fn = CoffeeTemplates.compile(mustache);
+            return done(null, js_fn.toString());
+          case '.css.coffee':
+            js_fn = eval('(function(){' + CoffeeScript.compile(data, {
+              bare: true
+            }) + '})');
+            engine = new CoffeeStylesheets(o.render_options);
+            if (o.sprite_options) {
+              engine.use(new CoffeeSprites(o.sprite_options));
+            }
+            return engine.render(js_fn, function(err, css) {
+              return done(err, css);
+            });
+          default:
+            return done(null, data);
+        }
+      } catch (err) {
+        return done(err);
       }
     };
   };
