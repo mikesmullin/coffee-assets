@@ -1,10 +1,13 @@
 async = require 'async2'
 fs = require 'fs'
 path = require 'path'
-coffee = require 'coffee-script'
+CoffeeScript = require 'coffee-script'
+CoffeeScript.require = require
 CoffeeTemplates = require 'coffee-templates'
 CoffeeStylesheets = require 'coffee-stylesheets'
 CoffeeSprites = require 'coffee-sprites'
+
+sandboxes = {}
 
 module.exports = class CoffeeAssets
   @aggregate: (file, cb) ->
@@ -27,36 +30,51 @@ module.exports = class CoffeeAssets
       return
     return
 
-  @precompile: (file, compile, cb) ->
+  @precompile: (file, compile, cb, lvl=0) ->
     s = ''
+    type = (m=file.match(/\..+$/)) isnt null and m[0]
     CoffeeAssets.aggregate file, (err, out) ->
       return cb err if err
       flow = new async()
       for k of out
         if typeof out[k] is 'string'
           ((data) -> flow.serial ->
-            done = @
-            type = (m=file.match(/\..+$/)) isnt null and m[0]
-            compile type, data, (err, compiled) ->
-              return cb err if err
-              s += compiled
-              done err
+            s += CoffeeAssets.escape_literal type, data
+            @()
             return
           )(out[k])
         else # object
           if out[k].directive is 'require'
             ((file2) -> flow.serial ->
               done = @
-              CoffeeAssets.precompile file2, compile, (err, compiled) ->
+              CoffeeAssets.precompile file2, compile, ((err, compiled) ->
                 return cb err if err
                 s += compiled
                 done err
+                return
+              ), lvl+1
               return
             )(path.resolve(path.dirname(file), out[k].file))
       flow.finally (err) ->
-        return cb err, s
+        cb err if err
+        if lvl is 0
+          compile type, s, cb # return compiled output
+        else
+          cb null, s # return CoffeeScript
+        return
       return
     return
+
+  @escape_literal: (type, data) ->
+    switch type
+      when '.js.coffee', '.css.coffee', '.html.coffee'
+        return data # as-is
+      when '.js'
+        return "\n`\n#{data.replace('`','\\`')}\n`\n" # escaped in CoffeeScript
+      when '.css'
+        return "\nliteral #{JSON.stringify(data)}\n" # escaped in CoffeeStylesheets
+      when '.html'
+        return "\nliteral #{JSON.stringify(data)}\n" # escaped in CoffeeTemplates
 
   @compiler: (o) ->
     o = o or {}
@@ -65,15 +83,15 @@ module.exports = class CoffeeAssets
     (type, data, done) ->
       switch type
         when '.js.coffee'
-          done null, coffee.compile data, bare: true
+          done null, CoffeeScript.compile data, bare: true
         when '.html.coffee'
-          js_fn = eval '(function(){'+coffee.compile(data, bare: true)+'})'
+          js_fn = eval '(function(){'+CoffeeScript.compile(data, bare: true)+'})'
           engine = new CoffeeTemplates o.render_options
           mustache = engine.render js_fn
           js_fn = CoffeeTemplates.compile mustache
           done null, js_fn.toString()
         when '.css.coffee'
-          js_fn = eval '(function(){'+coffee.compile(data, bare: true)+'})'
+          js_fn = eval '(function(){'+CoffeeScript.compile(data, bare: true)+'})'
           engine = new CoffeeStylesheets o.render_options
           if o.sprite_options
             engine.use new CoffeeSprites o.sprite_options
@@ -103,7 +121,7 @@ module.exports = class CoffeeAssets
       if file.match(/\.html\.coffee$/) isnt null
         key = path.resolve(file).slice(path.resolve(basepath, '..').length+1, -12)
         data = fs.readFileSync file
-        js_fn = eval '(function(){'+coffee.compile(''+data, bare: true)+'})'
+        js_fn = eval '(function(){'+CoffeeScript.compile(''+data, bare: true)+'})'
         mustache = engine.render js_fn
         templates[key] = CoffeeTemplates.compile mustache, false
     ), ->
