@@ -69,7 +69,7 @@ module.exports = CoffeeAssets = (function() {
         if (typeof out[k] === 'string') {
           (function(code) {
             return flow.serial(function() {
-              s += CoffeeAssets.escape_literal(type, code);
+              s += CoffeeAssets.escape_literal(file, type, code);
               this();
             });
           })(out[k]);
@@ -104,18 +104,21 @@ module.exports = CoffeeAssets = (function() {
     });
   };
 
-  CoffeeAssets.escape_literal = function(type, code) {
+  CoffeeAssets.escape_literal = function(file, type, code) {
+    var div;
+    div = (new Array((80 / 2) - 3)).join('-=') + '-';
+    file = './' + path.relative(process.cwd(), file);
     switch (type) {
       case '.js.coffee':
+        return ("\n###" + div + "\n" + file + "\n  " + div + " ###\n\n") + code;
+      case '.js':
+        return ("\n`\n\n/*" + div + "\n" + file + "\n  " + div + "\n */\n\n") + code.replace(/\`/g, '\\`') + "\n`\n";
       case '.css.coffee':
       case '.html.coffee':
-        return code;
-      case '.js':
-        return "\n`\n" + code.replace(/\`/g, '\\`') + "\n`\n";
+        return ("\ncomment '" + div + "\\n" + file + "\\n   " + div + "\\n'\n\n") + code;
       case '.css':
-        return "\nliteral " + (JSON.stringify(code)) + "\n";
       case '.html':
-        return "\nliteral " + (JSON.stringify(code)) + "\n";
+        return "\ncomment '" + div + "\\n" + file + "\\n   " + div + "\\n'\nliteral " + (JSON.stringify("\n\n" + code + "\n")) + "\n";
     }
   };
 

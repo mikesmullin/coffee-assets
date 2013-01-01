@@ -39,7 +39,7 @@ module.exports = class CoffeeAssets
       for k of out
         if typeof out[k] is 'string'
           ((code) -> flow.serial ->
-            s += CoffeeAssets.escape_literal type, code
+            s += CoffeeAssets.escape_literal file, type, code
             @()
             return
           )(out[k])
@@ -65,16 +65,18 @@ module.exports = class CoffeeAssets
       return
     return
 
-  @escape_literal: (type, code) ->
+  @escape_literal: (file, type, code) ->
+    div = (new Array((80/2)-3)).join('-=')+'-'
+    file = './'+path.relative process.cwd(), file
     switch type
-      when '.js.coffee', '.css.coffee', '.html.coffee'
-        return code # as-is
+      when '.js.coffee'
+        return "\n####{div}\n#{file}\n  #{div} ###\n\n"+code # as-is in CoffeeScript
       when '.js'
-        return "\n`\n"+code.replace(/\`/g, '\\`')+"\n`\n" # escaped in CoffeeScript
-      when '.css'
-        return "\nliteral #{JSON.stringify(code)}\n" # escaped in CoffeeStylesheets
-      when '.html'
-        return "\nliteral #{JSON.stringify(code)}\n" # escaped in CoffeeTemplates
+        return "\n`\n\n/*#{div}\n#{file}\n  #{div}\n */\n\n"+code.replace(/\`/g, '\\`')+"\n`\n" # escaped in CoffeeScript
+      when '.css.coffee', '.html.coffee'
+        return "\ncomment '#{div}\\n#{file}\\n   #{div}\\n'\n\n"+code # as-is in CoffeeScript
+      when '.css', '.html'
+        return "\ncomment '#{div}\\n#{file}\\n   #{div}\\n'\nliteral #{JSON.stringify("\n\n"+code+"\n")}\n" # escaped in CoffeeStylesheets / CoffeeTemplates
 
   @compiler: (o) ->
     o = o or {}
