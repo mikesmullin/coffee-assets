@@ -70,7 +70,7 @@ module.exports = class CoffeeAssets
       when '.js.coffee', '.css.coffee', '.html.coffee'
         return code # as-is
       when '.js'
-        return "\n`\n#{code.replace('`','\\`')}\n`\n" # escaped in CoffeeScript
+        return "\n`\n"+code.replace(/\`/g, '\\`')+"\n`\n" # escaped in CoffeeScript
       when '.css'
         return "\nliteral #{JSON.stringify(code)}\n" # escaped in CoffeeStylesheets
       when '.html'
