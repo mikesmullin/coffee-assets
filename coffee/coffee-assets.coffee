@@ -1,20 +1,26 @@
 async = require 'async2'
 fs = require 'fs'
 path = require 'path'
+mkdirp = require 'mkdirp'
 CoffeeScript = require 'coffee-script'
 CoffeeScript.require = require
 CoffeeTemplates = require 'coffee-templates'
 CoffeeStylesheets = require 'coffee-stylesheets'
 CoffeeSprites = require 'coffee-sprites'
 
-sandboxes = {}
-
 module.exports = class CoffeeAssets
-  @aggregate: (file, cb) ->
+  constructor: ->
+    @sandboxes = {}
+    @manifest = {}
+    @manifest_length = 0
+
+  parse_directives: (file, cb) ->
+    _this = @
     fs.exists file, (exists) ->
       return cb "#{file} does not exist." unless exists
       fs.readFile file, 'utf8', (err, code) ->
         return cb err if err
+        _this.manifest[file] = {} unless _this.manifest[file]
         directives = []
         lx=0
         code = code.replace `/^(#|\/\/|\/\*)= *(require) *([\w\d\-.\/\\]+) *(\*\/)?$/gm`, ->
@@ -24,22 +30,25 @@ module.exports = class CoffeeAssets
             directive: a[2]
             file: a[3]
           lx = a[5]+a[0].length # move cursor after token
+          # append to manifest
+          _this.manifest[file][a[3]] = _this.manifest_length++ unless _this.manifest[file][a[3]]
           return a[0]
         directives.push code.substr lx, code.length-lx # contents after
         return cb null, directives
       return
     return
 
-  @precompile: (file, compile, cb, lvl=0) ->
+  precompile: (file, compile, cb, lvl=0) ->
+    _this = @
     s = ''
     type = (m=file.match(/\..+$/)) isnt null and m[0]
-    CoffeeAssets.aggregate file, (err, out) ->
+    @parse_directives file, (err, out) ->
       return cb err if err
       flow = new async()
       for k of out
         if typeof out[k] is 'string'
           ((code) -> flow.serial ->
-            s += CoffeeAssets.escape_literal file, type, code
+            s += _this.escape_literal file, type, code
             @()
             return
           )(out[k])
@@ -47,7 +56,7 @@ module.exports = class CoffeeAssets
           if out[k].directive is 'require'
             ((file2) -> flow.serial ->
               done = @
-              CoffeeAssets.precompile file2, compile, ((err, compiled) ->
+              _this.precompile file2, compile, ((err, compiled) ->
                 return cb err if err
                 s += compiled
                 done err
@@ -65,9 +74,9 @@ module.exports = class CoffeeAssets
       return
     return
 
-  @escape_literal: (file, type, code) ->
+  escape_literal: (file, type, code) ->
     div = (new Array((80/2)-3)).join('-=')+'-'
-    file = './'+path.relative process.cwd(), file
+    file = path.relative process.cwd(), file
     switch type
       when '.js.coffee'
         return "\n####{div}\n#{file}\n  #{div} ###\n\n"+code # as-is in CoffeeScript
@@ -78,11 +87,11 @@ module.exports = class CoffeeAssets
       when '.css', '.html'
         return "\ncomment '#{div}\\n#{file}\\n   #{div}\\n'\nliteral #{JSON.stringify("\n\n"+code+"\n")}\n" # escaped in CoffeeStylesheets / CoffeeTemplates
 
-  @compiler: (o) ->
+  compiler: (o) ->
     o = o or {}
     o.render_options = o.render_options or format: true
 
-    (type, code, done) ->
+    (type, code, done) =>
       try
         switch type
           when '.js.coffee'
@@ -104,10 +113,11 @@ module.exports = class CoffeeAssets
             done null, code
       catch err
         err.lineNumber = err.lineNumber or (m=err.message.match(`/ on line (\d+)/`)) isnt null and m[1]
-        err.message += CoffeeAssets.excerpt code, err.lineNumber, 5 if err.lineNumber
+        err.message += @excerpt code, err.lineNumber, 5 if err.lineNumber
         done err
 
-  @excerpt: (code, lineNumber, grab=5) ->
+  # for debugging
+  excerpt: (code, lineNumber, grab=5) ->
     start = lineNumber-(Math.floor(grab/2)+1)
     lines = code.split("\n")
     lines.splice(0, Math.max(0, start))
@@ -120,7 +130,7 @@ module.exports = class CoffeeAssets
     return "\n\n"+lines.join("\n")+"\n"
 
   # currently only used for templates
-  @precompile_all: (basepath, o, cb) ->
+  precompile_all: (basepath, o, cb) ->
     engine = new CoffeeTemplates o.render_options
     templates = {}
     walk = (basepath, cb, done) ->
@@ -133,7 +143,7 @@ module.exports = class CoffeeAssets
           walk abspath, cb
         else
           cb abspath
-      done() if typeof done is 'function'
+      done null
       return dirs
 
     walk basepath, ((file) -> # walk the directory hierarchy
@@ -145,13 +155,49 @@ module.exports = class CoffeeAssets
         templates[key] = CoffeeTemplates.compile mustache, false
     ), ->
       js_fn = CoffeeTemplates.compileAll templates, o.compile_options
-      return cb null, js_fn.toString()
+      cb null, js_fn.toString()
 
-  @digest: ->
+  write: (infile, outfile, data, manifest_path, cb) ->
+    # all manifest files must be relative to manifest.json
+    manifest_file = path.join manifest_path, 'manifest.json'
+    outfile = path.relative manifest_path, outfile
+    @manifest[outfile] = @manifest[infile]; delete @manifest[infile] # rename infile to outfile
+    for file of @manifest
+      for directive of @manifest[file]
+        @manifest[file][directive] = path.relative manifest_path, @manifest[file][directive]
 
-  @minify: ->
+    console.log @manifest
 
-  @gzip: ->
+    write_outfile = ->
+      outfile = path.join manifest_path, outfile
+      mkdirp.sync path.dirname outfile
+      fs.writeFile outfile, data, 'utf8', (err) ->
+        return cb err if err
+        read_manifest()
 
-  @clean: ->
+    read_manifest = =>
+      fs.exists manifest_file, (exists) => if exists
+        fs.readFile manifest_file, 'utf8', (err, str) =>
+          return cb err if err
+          # merge memory version over disk version
+          json = JSON.parse str
+          for file of @manifest[file]
+            json[file] = @manifest[file]
+          @manifest = json
+          write_manifest()
+
+    write_manifest = =>
+      fs.writeFile manifest_file, JSON.stringify(@manifest, null, 2), 'utf8', (err) ->
+        return cb err if err
+        cb null
+
+    write_outfile()
+
+  digest: ->
+
+  minify: ->
+
+  gzip: ->
+
+  clean: ->
 

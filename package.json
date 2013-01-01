@@ -36,6 +36,7 @@
     "coffee-templates": ">=0.0.1",
     "coffee-stylesheets": ">=0.0.1",
     "coffee-sprites": ">=0.0.1",
-    "async2": ">=0.0.1"
+    "async2": ">=0.0.1",
+    "mkdirp": "~0.3.4"
   }
 }
