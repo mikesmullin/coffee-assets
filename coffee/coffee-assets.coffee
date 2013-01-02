@@ -66,7 +66,7 @@ module.exports = class CoffeeAssets
       flow.finally (err) ->
         cb err if err
         if lvl is 0
-          compile type, s, cb # return compiled output
+          compile file, type, s, cb # return compiled output
         else
           cb null, s # return CoffeeScript
         return
@@ -78,19 +78,19 @@ module.exports = class CoffeeAssets
     file = path.relative process.cwd(), file
     switch type
       when '.js.coffee'
-        return "\n####{div}\n#{file}\n  #{div} ###\n\n"+code # as-is in CoffeeScript
+        return "\n"+code # as-is in CoffeeScript
       when '.js'
-        return "\n`\n\n/*#{div}\n#{file}\n  #{div}\n */\n\n"+code.replace(/\`/g, '\\`')+"\n`\n" # escaped in CoffeeScript
+        return "\n`\n"+code.replace(/\`/g, '\\`')+"\n`\n" # escaped in CoffeeScript
       when '.css.coffee', '.html.coffee'
-        return "\ncomment '#{div}\\n#{file}\\n   #{div}\\n'\n\n"+code # as-is in CoffeeScript
+        return "\n"+code # as-is in CoffeeScript
       when '.css', '.html'
-        return "\ncomment '#{div}\\n#{file}\\n   #{div}\\n'\nliteral #{JSON.stringify("\n\n"+code+"\n")}\n" # escaped in CoffeeStylesheets / CoffeeTemplates
+        return "\nliteral #{JSON.stringify("\n"+code+"\n")}\n" # escaped in CoffeeStylesheets / CoffeeTemplates
 
   compiler: (o) ->
     o = o or {}
-    o.render_options = o.render_options or format: true
+    o.render_options = o.render_options or {}
 
-    (type, code, done) =>
+    (file, type, code, done) =>
       try
         switch type
           when '.js.coffee'
@@ -103,6 +103,7 @@ module.exports = class CoffeeAssets
             done null, js_fn.toString()
           when '.css.coffee'
             js_fn = eval '(function(){'+CoffeeScript.compile(code, bare: true)+'})'
+            o.render_options.file = file
             engine = new CoffeeStylesheets o.render_options
             if o.sprite_options
               engine.use new CoffeeSprites o.sprite_options
@@ -142,7 +143,7 @@ module.exports = class CoffeeAssets
           walk abspath, cb
         else
           cb abspath
-      done null
+      done null if typeof done is 'function' # not specified during recursion
       return dirs
 
     walk basepath, ((file) -> # walk the directory hierarchy
@@ -163,37 +164,38 @@ module.exports = class CoffeeAssets
       mkdirp.sync path.dirname outfile
       fs.writeFile outfile, compiled_output, 'utf8', (err) ->
         return cb err if err
-        read_manifest()
-
-    # we only read the manifest first to merge it
-    # with what we will be writing
-    # since we only write one output file at a time
-    # we only actually merge over the disk version
-    # on the current file
-    # since (assuming coffee-assets was used to precompile)
-    # we would now know something new about the file
-    # which was just parsed, and we are outputting
-    read_manifest = =>
-      fs.exists manifest_file, (exists) => if exists
-        fs.readFile manifest_file, 'utf8', (err, str) =>
-          return cb err if err
-          # update manifest for this particular file
-          manifest = JSON.parse str
-          # convert in-memory directives from a random-order object (for uniqueness)
-          # to an ordered array (for storage and processing)
-          directives = new Array @manifest[infile].length
-          for directive, index of @manifest[infile]
-            # directive paths must be named relative to manifest.json
-            directives[index] = path.relative manifest_path, directive
-          manifest[outfile] = directives
-          # all files must be named relative to manifest.json
-          outfile = path.relative manifest_path, outfile
-          write_manifest()
-
-    write_manifest = =>
-      fs.writeFile manifest_file, JSON.stringify(@manifest, null, 2), 'utf8', (err) ->
-        return cb err if err
+        #read_manifest()
         cb null
+
+    ## we only read the manifest first to merge it
+    ## with what we will be writing
+    ## since we only write one output file at a time
+    ## we only actually merge over the disk version
+    ## on the current file
+    ## since (assuming coffee-assets was used to precompile)
+    ## we would now know something new about the file
+    ## which was just parsed, and we are outputting
+    #read_manifest = =>
+    #  fs.exists manifest_file, (exists) => if exists
+    #    fs.readFile manifest_file, 'utf8', (err, str) =>
+    #      return cb err if err
+    #      # update manifest for this particular file
+    #      manifest = JSON.parse str
+    #      # convert in-memory directives from a random-order object (for uniqueness)
+    #      # to an ordered array (for storage and processing)
+    #      directives = new Array @manifest[infile].length
+    #      for directive, index of @manifest[infile]
+    #        # directive paths must be named relative to manifest.json
+    #        directives[index] = path.relative manifest_path, directive
+    #      manifest[outfile] = directives
+    #      # all files must be named relative to manifest.json
+    #      outfile = path.relative manifest_path, outfile
+    #      write_manifest()
+
+    #write_manifest = =>
+    #  fs.writeFile manifest_file, JSON.stringify(@manifest, null, 2), 'utf8', (err) ->
+    #    return cb err if err
+    #    cb null
 
     write_outfile()
 

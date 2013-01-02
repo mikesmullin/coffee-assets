@@ -24,7 +24,6 @@ module.exports = CoffeeAssets = (function() {
   function CoffeeAssets() {
     this.sandboxes = {};
     this.manifest = {};
-    this.manifest_length = 0;
   }
 
   CoffeeAssets.prototype.parse_directives = function(file, cb) {
@@ -40,7 +39,10 @@ module.exports = CoffeeAssets = (function() {
           return cb(err);
         }
         if (!_this.manifest[file]) {
-          _this.manifest[file] = {};
+          _this.manifest[file] = {
+            length: 0,
+            files: {}
+          };
         }
         directives = [];
         lx = 0;
@@ -53,8 +55,8 @@ module.exports = CoffeeAssets = (function() {
             file: a[3]
           });
           lx = a[5] + a[0].length;
-          if (!_this.manifest[file][a[3]]) {
-            _this.manifest[file][a[3]] = _this.manifest_length++;
+          if (!_this.manifest[file].files[a[3]]) {
+            _this.manifest[file].files[a[3]] = _this.manifest[file].length++;
           }
           return a[0];
         });
@@ -109,7 +111,7 @@ module.exports = CoffeeAssets = (function() {
           cb(err);
         }
         if (lvl === 0) {
-          compile(type, s, cb);
+          compile(file, type, s, cb);
         } else {
           cb(null, s);
         }
@@ -123,25 +125,23 @@ module.exports = CoffeeAssets = (function() {
     file = path.relative(process.cwd(), file);
     switch (type) {
       case '.js.coffee':
-        return ("\n###" + div + "\n" + file + "\n  " + div + " ###\n\n") + code;
+        return "\n" + code;
       case '.js':
-        return ("\n`\n\n/*" + div + "\n" + file + "\n  " + div + "\n */\n\n") + code.replace(/\`/g, '\\`') + "\n`\n";
+        return "\n`\n" + code.replace(/\`/g, '\\`') + "\n`\n";
       case '.css.coffee':
       case '.html.coffee':
-        return ("\ncomment '" + div + "\\n" + file + "\\n   " + div + "\\n'\n\n") + code;
+        return "\n" + code;
       case '.css':
       case '.html':
-        return "\ncomment '" + div + "\\n" + file + "\\n   " + div + "\\n'\nliteral " + (JSON.stringify("\n\n" + code + "\n")) + "\n";
+        return "\nliteral " + (JSON.stringify("\n" + code + "\n")) + "\n";
     }
   };
 
   CoffeeAssets.prototype.compiler = function(o) {
     var _this = this;
     o = o || {};
-    o.render_options = o.render_options || {
-      format: true
-    };
-    return function(type, code, done) {
+    o.render_options = o.render_options || {};
+    return function(file, type, code, done) {
       var engine, js_fn, m, mustache;
       try {
         switch (type) {
@@ -161,6 +161,7 @@ module.exports = CoffeeAssets = (function() {
             js_fn = eval('(function(){' + CoffeeScript.compile(code, {
               bare: true
             }) + '})');
+            o.render_options.file = file;
             engine = new CoffeeStylesheets(o.render_options);
             if (o.sprite_options) {
               engine.use(new CoffeeSprites(o.sprite_options));
@@ -217,7 +218,9 @@ module.exports = CoffeeAssets = (function() {
           cb(abspath);
         }
       }
-      done(null);
+      if (typeof done === 'function') {
+        done(null);
+      }
       return dirs;
     };
     return walk(basepath, (function(file) {
@@ -238,57 +241,12 @@ module.exports = CoffeeAssets = (function() {
     });
   };
 
-  CoffeeAssets.prototype.write = function(infile, outfile, data, manifest_path, cb) {
-    var directive, file, manifest_file, read_manifest, write_manifest, write_outfile,
-      _this = this;
+  CoffeeAssets.prototype.write = function(infile, outfile, compiled_output, manifest_path, cb) {
+    var manifest_file, write_outfile;
     manifest_file = path.join(manifest_path, 'manifest.json');
-    console.log({
-      infile: infile,
-      outfile: outfile,
-      manifest_path: manifest_path
-    });
-    for (file in this.manifest) {
-      for (directive in this.manifest[file]) {
-        console.log({
-          file: file,
-          directive: directive,
-          directive_file: this.manifest[file][directive]
-        });
-      }
-    }
-    cb(null);
-    return;
-    console.log(this.manifest);
     write_outfile = function() {
-      outfile = path.join(manifest_path, outfile);
       mkdirp.sync(path.dirname(outfile));
-      return fs.writeFile(outfile, data, 'utf8', function(err) {
-        if (err) {
-          return cb(err);
-        }
-        return read_manifest();
-      });
-    };
-    read_manifest = function() {
-      return fs.exists(manifest_file, function(exists) {
-        if (exists) {
-          return fs.readFile(manifest_file, 'utf8', function(err, str) {
-            var json;
-            if (err) {
-              return cb(err);
-            }
-            json = JSON.parse(str);
-            for (file in _this.manifest[file]) {
-              json[file] = _this.manifest[file];
-            }
-            _this.manifest = json;
-            return write_manifest();
-          });
-        }
-      });
-    };
-    write_manifest = function() {
-      return fs.writeFile(manifest_file, JSON.stringify(_this.manifest, null, 2), 'utf8', function(err) {
+      return fs.writeFile(outfile, compiled_output, 'utf8', function(err) {
         if (err) {
           return cb(err);
         }
