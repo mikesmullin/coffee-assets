@@ -242,14 +242,22 @@ module.exports = CoffeeAssets = (function() {
     var directive, file, manifest_file, read_manifest, write_manifest, write_outfile,
       _this = this;
     manifest_file = path.join(manifest_path, 'manifest.json');
-    outfile = path.relative(manifest_path, outfile);
-    this.manifest[outfile] = this.manifest[infile];
-    delete this.manifest[infile];
+    console.log({
+      infile: infile,
+      outfile: outfile,
+      manifest_path: manifest_path
+    });
     for (file in this.manifest) {
       for (directive in this.manifest[file]) {
-        this.manifest[file][directive] = path.relative(manifest_path, this.manifest[file][directive]);
+        console.log({
+          file: file,
+          directive: directive,
+          directive_file: this.manifest[file][directive]
+        });
       }
     }
+    cb(null);
+    return;
     console.log(this.manifest);
     write_outfile = function() {
       outfile = path.join(manifest_path, outfile);

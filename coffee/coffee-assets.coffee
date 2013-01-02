@@ -12,7 +12,6 @@ module.exports = class CoffeeAssets
   constructor: ->
     @sandboxes = {}
     @manifest = {}
-    @manifest_length = 0
 
   parse_directives: (file, cb) ->
     _this = @
@@ -20,7 +19,7 @@ module.exports = class CoffeeAssets
       return cb "#{file} does not exist." unless exists
       fs.readFile file, 'utf8', (err, code) ->
         return cb err if err
-        _this.manifest[file] = {} unless _this.manifest[file]
+        _this.manifest[file] = length: 0, files: {} unless _this.manifest[file]
         directives = []
         lx=0
         code = code.replace `/^(#|\/\/|\/\*)= *(require) *([\w\d\-.\/\\]+) *(\*\/)?$/gm`, ->
@@ -31,7 +30,7 @@ module.exports = class CoffeeAssets
             file: a[3]
           lx = a[5]+a[0].length # move cursor after token
           # append to manifest
-          _this.manifest[file][a[3]] = _this.manifest_length++ unless _this.manifest[file][a[3]]
+          _this.manifest[file].files[a[3]] = _this.manifest[file].length++ unless _this.manifest[file].files[a[3]]
           return a[0]
         directives.push code.substr lx, code.length-lx # contents after
         return cb null, directives
@@ -157,33 +156,38 @@ module.exports = class CoffeeAssets
       js_fn = CoffeeTemplates.compileAll templates, o.compile_options
       cb null, js_fn.toString()
 
-  write: (infile, outfile, data, manifest_path, cb) ->
-    # all manifest files must be relative to manifest.json
+  write: (infile, outfile, compiled_output, manifest_path, cb) ->
     manifest_file = path.join manifest_path, 'manifest.json'
-    outfile = path.relative manifest_path, outfile
-    @manifest[outfile] = @manifest[infile]; delete @manifest[infile] # rename infile to outfile
-    for file of @manifest
-      for directive of @manifest[file]
-        @manifest[file][directive] = path.relative manifest_path, @manifest[file][directive]
-
-    console.log @manifest
 
     write_outfile = ->
-      outfile = path.join manifest_path, outfile
       mkdirp.sync path.dirname outfile
-      fs.writeFile outfile, data, 'utf8', (err) ->
+      fs.writeFile outfile, compiled_output, 'utf8', (err) ->
         return cb err if err
         read_manifest()
 
+    # we only read the manifest first to merge it
+    # with what we will be writing
+    # since we only write one output file at a time
+    # we only actually merge over the disk version
+    # on the current file
+    # since (assuming coffee-assets was used to precompile)
+    # we would now know something new about the file
+    # which was just parsed, and we are outputting
     read_manifest = =>
       fs.exists manifest_file, (exists) => if exists
         fs.readFile manifest_file, 'utf8', (err, str) =>
           return cb err if err
-          # merge memory version over disk version
-          json = JSON.parse str
-          for file of @manifest[file]
-            json[file] = @manifest[file]
-          @manifest = json
+          # update manifest for this particular file
+          manifest = JSON.parse str
+          # convert in-memory directives from a random-order object (for uniqueness)
+          # to an ordered array (for storage and processing)
+          directives = new Array @manifest[infile].length
+          for directive, index of @manifest[infile]
+            # directive paths must be named relative to manifest.json
+            directives[index] = path.relative manifest_path, directive
+          manifest[outfile] = directives
+          # all files must be named relative to manifest.json
+          outfile = path.relative manifest_path, outfile
           write_manifest()
 
     write_manifest = =>
