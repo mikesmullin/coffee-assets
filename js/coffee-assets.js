@@ -127,7 +127,7 @@ module.exports = CoffeeAssets = (function() {
       case '.js.coffee':
         return "\n" + code;
       case '.js':
-        return "\n`\n" + code.replace(/\`/g, '\\`') + "\n`\n";
+        return "\n" + code.replace(/\`/g, '\\`') + "\n";
       case '.css.coffee':
       case '.html.coffee':
         return "\n" + code;
