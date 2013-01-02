@@ -2,7 +2,7 @@
 
 **CoffeeAssets** will bulk compile [CoffeeTemplates](https://github.com/mikesmullin/coffee-templates), [CoffeeScript](http://coffeescript.org/), and [CoffeeStylesheets](https://github.com/mikesmullin/coffee-stylesheets) with support for [CoffeeSprites](https://github.com/mikesmullin/coffee-sprites).
 Optionally aggregating these using [Sprockets](https://github.com/sstephenson/sprockets)-like `#= require ./../file` directives, minifying with [Google Closure](https://developers.google.com/closure/compiler/), suffixing a digest,
-writing a `manifest.json`, and gzipping into the neat little production-quality packages you expect. Additionally, its
+writing a `manifest.json`, and gzipping into the neat little stable-quality packages you expect. Additionally, its
 *incredibly fast*, with no meddling middleware dependencies, or [slow](https://github.com/gradus/coffeecup) [transpilers](https://github.com/learnboost/stylus) inbetween.
 
 Inspired by
@@ -85,4 +85,4 @@ watch 'precompile/views/shared/**/*.html.coffee', ->
     write 'static/public/assets/templates.js', compiled
 ```
 
-For the most recent and comprehensive examples, see [CoffeeShop's Cakefile](https://github.com/mikesmullin/coffee-shop/blob/production/skeleton/Cakefile).
+For the most recent and comprehensive examples, see [CoffeeShop's Cakefile](https://github.com/mikesmullin/coffee-shop/blob/stable/skeleton/Cakefile).

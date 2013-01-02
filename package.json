@@ -1,6 +1,6 @@
 {
   "name": "coffee-assets",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Sprockets syntax for aggregating/minifying/gzipping CoffeeTemplates, CoffeeStylesheets, and CoffeeSprites.",
   "main": "js/coffee-assets.js",
   "directories": {
@@ -29,14 +29,14 @@
   "license": "MIT",
   "readmeFilename": "README.md",
   "devDependencies": {
-    "chai": "~1.4.0"
+    "chai": "*"
   },
   "dependencies": {
-    "coffee-script": ">=1.4.0",
-    "coffee-templates": ">=0.0.1",
-    "coffee-stylesheets": ">=0.0.1",
-    "coffee-sprites": ">=0.0.1",
-    "async2": ">=0.0.1",
-    "mkdirp": "~0.3.4"
+    "coffee-script": "*",
+    "coffee-templates": "https://github.com/mikesmullin/coffee-templates/tarball/stable",
+    "coffee-stylesheets": "https://github.com/mikesmullin/coffee-stylesheets/tarball/stable",
+    "coffee-sprites": "https://github.com/mikesmullin/coffee-sprites/tarball/stable",
+    "async2": "https://github.com/mikesmullin/async2/tarball/stable",
+    "mkdirp": "*"
   }
 }
