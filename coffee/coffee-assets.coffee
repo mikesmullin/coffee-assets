@@ -152,10 +152,10 @@ module.exports = class CoffeeAssets
         code = fs.readFileSync file
         js_fn = eval '(function(){'+CoffeeScript.compile(''+code, bare: true)+'})'
         mustache = engine.render js_fn
-        templates[key] = CoffeeTemplates.compile mustache, false
+        templates[key] = mustache
     ), ->
       js_fn = CoffeeTemplates.compileAll templates, o.compile_options
-      cb null, js_fn.toString()
+      cb null, 'var templates='+js_fn.toString()
 
   write: (infile, outfile, compiled_output, manifest_path, cb) ->
     manifest_file = path.join manifest_path, 'manifest.json'

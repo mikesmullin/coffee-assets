@@ -232,12 +232,12 @@ module.exports = CoffeeAssets = (function() {
           bare: true
         }) + '})');
         mustache = engine.render(js_fn);
-        return templates[key] = CoffeeTemplates.compile(mustache, false);
+        return templates[key] = mustache;
       }
     }), function() {
       var js_fn;
       js_fn = CoffeeTemplates.compileAll(templates, o.compile_options);
-      return cb(null, js_fn.toString());
+      return cb(null, 'var templates=' + js_fn.toString());
     });
   };
 
