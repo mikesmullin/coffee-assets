@@ -14,13 +14,16 @@ CoffeeStylesheets    = require 'coffee-stylesheets'
 CoffeeSprites        = require 'coffee-sprites'
 
 module.exports = class CoffeeAssets
-  constructor: ->
+  constructor: (o) ->
     @sandboxes    = {}
     @manifest     = {}
     @_titles      = {}
     @_color_index = 0
     @colors       = [ '\u001b[33m', '\u001b[34m', '\u001b[35m', '\u001b[36m', '\u001b[31m', '\u001b[32m', '\u001b[1m\u001b[33m', '\u001b[1m\u001b[34m', '\u001b[1m\u001b[35m', '\u001b[1m\u001b[36m', '\u001b[1m\u001b[31m', '\u001b[1m\u001b[32m' ]
     @node_child   = null
+    o = o or {}
+    o.asset_path = o.asset_path or 'static/public/assets'
+    @o = o
 
   @path: path
 
@@ -29,18 +32,19 @@ module.exports = class CoffeeAssets
   notify: (title, msg, image, err, show) ->
     @_titles[title] = @_color_index++ if typeof @_titles[title] is 'undefined'
     msg = msg.stack if err and typeof msg is 'object' and typeof msg.stack isnt 'undefined'
-    console.log "#{@colors[@_titles[title]]}#{title}:\u001b[0m #{msg.toString().replace(/[\r\n]+$/, '')}"
     growl msg, image: path.xplat(__dirname, "/../images/#{image}.png"), title: title if show
+    msg = (''+msg).replace(/[\r\n]+$/, '')
+    console.log "#{@colors[@_titles[title]]}#{title}:\u001b[0m #{msg}"
+    "#{title}: #{msg}"
 
   watch: ->
     a = arguments
     cb = a[a.length-1]
-    if a.length is 2
+    if a.length is 3
       globs = [ in: [''], out: '' ]
-      suffix = a[0]
-    else if a.length is  3
-      globs = a[0]
-      suffix = a[1]
+      [title, suffix] = a
+    else if a.length is  4
+      [title, globs, suffix] = a
     for k, glob of globs
       glob.in = [ glob.in ] if typeof glob.in is 'string'
       for kk of glob.in
@@ -49,15 +53,33 @@ module.exports = class CoffeeAssets
           gaze path.join(process.cwd(), glob.in+glob.suffix), (err, watcher) =>
             @notify 'gaze', err, 'failure', true, false if err
             ` this`.on 'changed', (file) ->
-              relout = path.join glob.out, path.relative path.join(process.cwd(), glob.in), file
-              cb path.relative(process.cwd(), file), relout, glob.in, glob.out
+              async.push title, (next) -> cb
+                title: title
+                infile: path.relative process.cwd(), file
+                outfile: path.join glob.out, path.relative path.join(process.cwd(), glob.in), file
+                inpath: glob.in
+                outpath: glob.out
+                cb: next
         )(in: glob.in[kk] and path.xplat(glob.in[kk]), out: glob.out and path.xplat(glob.out), suffix: glob.suffix or suffix)
 
-  write_manager: (title, asset_path, infile, outfile) => (err, compiled_output) =>
-    return @notify title, err, 'failure', true, true if err
-    @write infile, outfile, compiled_output, asset_path, (err) =>
-      return @notify title, "unable to write #{outfile}. #{err}", 'failure', true, true if err
-      @notify title, "wrote #{outfile}", 'success', false, true
+  common_compiler: (compiler_options) -> (o) =>
+    o.asset_path = o.asset_path or @o.asset_path
+    o.outfile = o.outfile.replace(/\.coffee$/, '')
+    @precompile o.infile, @compiler(compiler_options), @write_manager o
+
+  write_manager: (o) -> (err, compiled_output) =>
+    return o.cb @notify o.title, err, 'failure', true, true if err
+    @write o.infile, o.outfile, compiled_output, o.asset_path, (err) =>
+      return o.cb @notify o.title, "unable to write #{o.outfile}. #{err}", 'failure', true, true if err
+      @notify o.title, "wrote #{o.outfile}", 'success', false, true
+      o.cb null
+
+  write: (infile, outfile, compiled_output, manifest_path, cb) ->
+    manifest_file = path.join manifest_path, 'manifest.json'
+    mkdirp.sync path.dirname outfile
+    fs.writeFile outfile, compiled_output, 'utf8', (err) ->
+      return cb err if err
+      cb null
 
   restart_node: ->
     @node_child.kill() if @node_child
@@ -156,8 +178,7 @@ module.exports = class CoffeeAssets
       try
         switch type
           when '.json.coffee'
-            # helpers
-            _=(a,b)->c={};c[k]=a[k]for k of a;c[k]=b[k]for k of b;c # merge
+            _=(a,b)->c={};c[k]=a[k]for k of a;c[k]=b[k]for k of b;c # merge helper
             data = eval CoffeeScript.compile code, bare: true
             done null, JSON.stringify data, null, 2
           when '.js.coffee'
@@ -223,13 +244,6 @@ module.exports = class CoffeeAssets
     ), ->
       js_fn = CoffeeTemplates.compileAll templates, o.compile_options
       cb null, 'var templates='+js_fn.toString()
-
-  write: (infile, outfile, compiled_output, manifest_path, cb) ->
-    manifest_file = path.join manifest_path, 'manifest.json'
-    mkdirp.sync path.dirname outfile
-    fs.writeFile outfile, compiled_output, 'utf8', (err) ->
-      return cb err if err
-      cb null
 
   digest: ->
 
