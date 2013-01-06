@@ -1,17 +1,83 @@
-async = require 'async2'
-fs = require 'fs'
-path = require 'path'
-mkdirp = require 'mkdirp'
-CoffeeScript = require 'coffee-script'
-CoffeeScript.require = require
-CoffeeTemplates = require 'coffee-templates'
-CoffeeStylesheets = require 'coffee-stylesheets'
-CoffeeSprites = require 'coffee-sprites'
+async                = require 'async2'
+fs                   = require 'fs'
+path                 = require 'path'
+path.xplat           = (b,s)->path.join.apply null,if s then [b].concat s.split '/' else b.split '/' # makes *nix paths cross-platform compatible
+require_fresh        = (a)->delete require.cache[require.resolve a];require a
+mkdirp               = require 'mkdirp'
+growl                = require 'growl'
+gaze                 = require 'gaze'
+child_process        = require 'child_process'
+async                = require 'async2'
+CoffeeScript         = require 'coffee-script'
+CoffeeTemplates      = require 'coffee-templates'
+CoffeeStylesheets    = require 'coffee-stylesheets'
+CoffeeSprites        = require 'coffee-sprites'
 
 module.exports = class CoffeeAssets
   constructor: ->
-    @sandboxes = {}
-    @manifest = {}
+    @sandboxes    = {}
+    @manifest     = {}
+    @_titles      = {}
+    @_color_index = 0
+    @colors       = [ '\u001b[33m', '\u001b[34m', '\u001b[35m', '\u001b[36m', '\u001b[31m', '\u001b[32m', '\u001b[1m\u001b[33m', '\u001b[1m\u001b[34m', '\u001b[1m\u001b[35m', '\u001b[1m\u001b[36m', '\u001b[1m\u001b[31m', '\u001b[1m\u001b[32m' ]
+    @node_child   = null
+
+  @path: path
+
+  @require_fresh: require_fresh
+
+  notify: (title, msg, image, err, show) ->
+    @_titles[title] = @_color_index++ if typeof @_titles[title] is 'undefined'
+    msg = msg.stack if err and typeof msg is 'object' and typeof msg.stack isnt 'undefined'
+    console.log "#{@colors[@_titles[title]]}#{title}:\u001b[0m #{msg.toString().replace(/[\r\n]+$/, '')}"
+    growl msg, image: path.xplat(__dirname, "/../images/#{image}.png"), title: title if show
+
+  watch: ->
+    a = arguments
+    cb = a[a.length-1]
+    if a.length is 2
+      globs = [ in: [''], out: '' ]
+      suffix = a[0]
+    else if a.length is  3
+      globs = a[0]
+      suffix = a[1]
+    for k, glob of globs
+      glob.in = [ glob.in ] if typeof glob.in is 'string'
+      for kk of glob.in
+        ((glob) =>
+          @notify 'gaze', "watching #{glob.in+glob.suffix}", 'pending', false, false
+          gaze glob.in+glob.suffix, (err, watcher) =>
+            @notify 'gaze', err, 'failure', true, false if err
+            ` this`.on 'changed', (file) ->
+              relout = path.join glob.out, path.relative path.join(process.cwd(), glob.in), file
+              cb path.relative(process.cwd(), file), relout, glob.in, glob.out
+        )(in: glob.in[kk] and path.xplat(glob.in[kk]), out: glob.out and path.xplat(glob.out), suffix: glob.suffix or suffix)
+
+  write_manager: (title, infile, outfile) => (err, compiled_output) =>
+    return @notify title, err, 'failure', true, true if err
+    assets.write infile, outfile, compiled_output, asset_path, (err) =>
+      return @notify title, "unable to write #{outfile}. #{err}", 'failure', true, true if err
+      @notify title, "wrote #{outfile}", 'success', false, true
+
+  restart_node: ->
+    @node_child.kill() if @node_child
+
+  start_node: ->
+    last_start = new Date()
+    @node_child = child_process.spawn 'node', ['server.js']
+    @node_child.stdout.on 'data', (stdout) =>
+      @notify 'node', ''+stdout, 'pending', false, false
+    @node_child.stderr.on 'data', (stderr) =>
+      @notify 'node', ''+stderr, 'failure', true, false
+    @node_child.on 'exit', (code) =>
+      uptime = (new Date()-last_start)
+      @notify 'node', "node server died (uptime: #{uptime/1000}sec)", 'pending', false, false
+      if uptime < 2*1000
+        @notify 'node', 'due to short uptime, 15sec to restart...', 'pending', false, false
+        setTimeout start_node, 15*1000
+      else
+        start_node()
+    @notify 'node', 'spawned new server instance', 'pending', false, false
 
   parse_directives: (file, cb) ->
     _this = @
