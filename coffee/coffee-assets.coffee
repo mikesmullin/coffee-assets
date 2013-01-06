@@ -225,45 +225,10 @@ module.exports = class CoffeeAssets
 
   write: (infile, outfile, compiled_output, manifest_path, cb) ->
     manifest_file = path.join manifest_path, 'manifest.json'
-
-    write_outfile = ->
-      mkdirp.sync path.dirname outfile
-      fs.writeFile outfile, compiled_output, 'utf8', (err) ->
-        return cb err if err
-        #read_manifest()
-        cb null
-
-    ## we only read the manifest first to merge it
-    ## with what we will be writing
-    ## since we only write one output file at a time
-    ## we only actually merge over the disk version
-    ## on the current file
-    ## since (assuming coffee-assets was used to precompile)
-    ## we would now know something new about the file
-    ## which was just parsed, and we are outputting
-    #read_manifest = =>
-    #  fs.exists manifest_file, (exists) => if exists
-    #    fs.readFile manifest_file, 'utf8', (err, str) =>
-    #      return cb err if err
-    #      # update manifest for this particular file
-    #      manifest = JSON.parse str
-    #      # convert in-memory directives from a random-order object (for uniqueness)
-    #      # to an ordered array (for storage and processing)
-    #      directives = new Array @manifest[infile].length
-    #      for directive, index of @manifest[infile]
-    #        # directive paths must be named relative to manifest.json
-    #        directives[index] = path.relative manifest_path, directive
-    #      manifest[outfile] = directives
-    #      # all files must be named relative to manifest.json
-    #      outfile = path.relative manifest_path, outfile
-    #      write_manifest()
-
-    #write_manifest = =>
-    #  fs.writeFile manifest_file, JSON.stringify(@manifest, null, 2), 'utf8', (err) ->
-    #    return cb err if err
-    #    cb null
-
-    write_outfile()
+    mkdirp.sync path.dirname outfile
+    fs.writeFile outfile, compiled_output, 'utf8', (err) ->
+      return cb err if err
+      cb null
 
   digest: ->
 

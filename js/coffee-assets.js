@@ -380,18 +380,15 @@ module.exports = CoffeeAssets = (function() {
   };
 
   CoffeeAssets.prototype.write = function(infile, outfile, compiled_output, manifest_path, cb) {
-    var manifest_file, write_outfile;
+    var manifest_file;
     manifest_file = path.join(manifest_path, 'manifest.json');
-    write_outfile = function() {
-      mkdirp.sync(path.dirname(outfile));
-      return fs.writeFile(outfile, compiled_output, 'utf8', function(err) {
-        if (err) {
-          return cb(err);
-        }
-        return cb(null);
-      });
-    };
-    return write_outfile();
+    mkdirp.sync(path.dirname(outfile));
+    return fs.writeFile(outfile, compiled_output, 'utf8', function(err) {
+      if (err) {
+        return cb(err);
+      }
+      return cb(null);
+    });
   };
 
   CoffeeAssets.prototype.digest = function() {};
