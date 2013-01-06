@@ -106,9 +106,9 @@ module.exports = class CoffeeAssets
       @notify title, "exit with code #{code or 0} (uptime: #{uptime/1000}sec)", 'pending', false, false
       if uptime < 2*1000
         @notify title, 'short uptime; waiting 3sec to prevent bouncing...', 'pending', false, false
-        async.delay 3*1000, => @child_process_loop title, cmd, args, on_exit_cb
+        async.delay 3*1000, => @child_process_loop title, cmd, args
       else
-        @child_process_loop title, cmd, args, on_exit_cb
+        @child_process_loop title, cmd, args
     @notify title, 'spawned new instance', 'success', false, false
     return child
 
