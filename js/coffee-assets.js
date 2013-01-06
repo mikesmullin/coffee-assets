@@ -178,38 +178,39 @@ module.exports = CoffeeAssets = (function() {
     });
   };
 
-  CoffeeAssets.prototype.restart_node = function() {
-    if (this.node_child) {
-      this.node_child.kill('SIGHUP');
+  CoffeeAssets.prototype.restart_child_process = function(title, child) {
+    if (child) {
+      child.kill('SIGHUP');
+      return this.notify(title, 'sent SIGHUP to child process', 'pending', false, false);
     }
-    return this.notify('node', 'sent SIGHUP to node child process', 'pending', false, false);
   };
 
-  CoffeeAssets.prototype.start_node = function() {
-    var last_start,
+  CoffeeAssets.prototype.child_process_loop = function(title, cmd, args) {
+    var child, last_start,
       _this = this;
     last_start = new Date();
-    this.node_child = child_process.spawn('node', ['server.js']);
-    this.node_child.stdout.on('data', function(stdout) {
-      return _this.notify('node', '' + stdout, 'pending', false, false);
+    child = child_process.spawn(cmd, args);
+    child.stdout.on('data', function(stdout) {
+      return _this.notify(title, '' + stdout, 'pending', false, false);
     });
-    this.node_child.stderr.on('data', function(stderr) {
-      return _this.notify('node', '' + stderr, 'failure', true, false);
+    child.stderr.on('data', function(stderr) {
+      return _this.notify(title, '' + stderr, 'failure', true, false);
     });
-    this.node_child.on('exit', function(code) {
+    child.on('exit', function(code) {
       var uptime;
       uptime = new Date() - last_start;
-      _this.notify('node', "node server exit with code " + (code || 0) + " (uptime: " + (uptime / 1000) + "sec)", 'pending', false, false);
+      _this.notify(title, "exit with code " + (code || 0) + " (uptime: " + (uptime / 1000) + "sec)", 'pending', false, false);
       if (uptime < 2 * 1000) {
-        _this.notify('node', 'short uptime; waiting 3sec to prevent bouncing...', 'pending', false, false);
+        _this.notify(title, 'short uptime; waiting 3sec to prevent bouncing...', 'pending', false, false);
         return async.delay(3 * 1000, function() {
-          return _this.start_node;
+          return _this.child_process_loop(title, cmd, args, on_exit_cb);
         });
       } else {
-        return _this.start_node();
+        return _this.child_process_loop(title, cmd, args, on_exit_cb);
       }
     });
-    return this.notify('node', 'spawned new server instance', 'pending', false, false);
+    this.notify(title, 'spawned new instance', 'success', false, false);
+    return child;
   };
 
   CoffeeAssets.prototype.parse_directives = function(file, cb) {

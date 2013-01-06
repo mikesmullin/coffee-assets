@@ -89,26 +89,27 @@ module.exports = class CoffeeAssets
       return cb err if err
       cb null
 
-  restart_node: ->
-    @node_child.kill 'SIGHUP' if @node_child
-    @notify 'node', 'sent SIGHUP to node child process', 'pending', false, false
+  restart_child_process: (title, child) -> if child
+    child.kill 'SIGHUP'
+    @notify title, 'sent SIGHUP to child process', 'pending', false, false
 
-  start_node: ->
+  child_process_loop: (title, cmd, args) ->
     last_start = new Date()
-    @node_child = child_process.spawn 'node', ['server.js']
-    @node_child.stdout.on 'data', (stdout) =>
-      @notify 'node', ''+stdout, 'pending', false, false
-    @node_child.stderr.on 'data', (stderr) =>
-      @notify 'node', ''+stderr, 'failure', true, false
-    @node_child.on 'exit', (code) =>
+    child = child_process.spawn cmd, args
+    child.stdout.on 'data', (stdout) =>
+      @notify title, ''+stdout, 'pending', false, false
+    child.stderr.on 'data', (stderr) =>
+      @notify title, ''+stderr, 'failure', true, false
+    child.on 'exit', (code) =>
       uptime = (new Date()-last_start)
-      @notify 'node', "node server exit with code #{code or 0} (uptime: #{uptime/1000}sec)", 'pending', false, false
+      @notify title, "exit with code #{code or 0} (uptime: #{uptime/1000}sec)", 'pending', false, false
       if uptime < 2*1000
-        @notify 'node', 'short uptime; waiting 3sec to prevent bouncing...', 'pending', false, false
-        async.delay 3*1000, => @start_node
+        @notify title, 'short uptime; waiting 3sec to prevent bouncing...', 'pending', false, false
+        async.delay 3*1000, => @child_process_loop title, cmd, args, on_exit_cb
       else
-        @start_node()
-    @notify 'node', 'spawned new server instance', 'pending', false, false
+        @child_process_loop title, cmd, args, on_exit_cb
+    @notify title, 'spawned new instance', 'success', false, false
+    return child
 
   parse_directives: (file, cb) ->
     _this = @
