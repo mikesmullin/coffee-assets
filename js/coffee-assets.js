@@ -118,7 +118,7 @@ module.exports = CoffeeAssets = (function() {
     return _results;
   };
 
-  CoffeeAssets.prototype.write_manager = function(asset_path, title, infile, outfile) {
+  CoffeeAssets.prototype.write_manager = function(title, asset_path, infile, outfile) {
     var _this = this;
     return function(err, compiled_output) {
       if (err) {
@@ -205,11 +205,11 @@ module.exports = CoffeeAssets = (function() {
   };
 
   CoffeeAssets.prototype.precompile = function(file, compile, cb, lvl) {
-    var m, s, type, _this;
+    var m, s, type,
+      _this = this;
     if (lvl == null) {
       lvl = 0;
     }
-    _this = this;
     s = '';
     type = (m = file.match(/\..+$/)) !== null && m[0];
     this.parse_directives(file, function(err, out) {
@@ -221,23 +221,21 @@ module.exports = CoffeeAssets = (function() {
       for (k in out) {
         if (typeof out[k] === 'string') {
           (function(code) {
-            return flow.serial(function() {
+            return flow.serial(function(next) {
               s += _this.escape_literal(file, type, code);
-              this();
+              return next();
             });
           })(out[k]);
         } else {
           if (out[k].directive === 'require') {
             (function(file2) {
-              return flow.serial(function() {
-                var done;
-                done = this;
+              return flow.serial(function(next) {
                 _this.precompile(file2, compile, (function(err, compiled) {
                   if (err) {
                     return cb(err);
                   }
                   s += compiled;
-                  done(err);
+                  return next(null);
                 }), lvl + 1);
               });
             })(path.resolve(path.dirname(file), out[k].file));
@@ -246,7 +244,7 @@ module.exports = CoffeeAssets = (function() {
       }
       flow["finally"](function(err) {
         if (err) {
-          cb(err);
+          return cb(err);
         }
         if (lvl === 0) {
           compile(file, type, s, cb);
@@ -263,6 +261,7 @@ module.exports = CoffeeAssets = (function() {
     file = path.relative(process.cwd(), file);
     switch (type) {
       case '.js.coffee':
+      case '.json.coffee':
         return "\n" + code;
       case '.js':
         return "\n" + code.replace(/\`/g, '\\`') + "\n";
@@ -280,9 +279,25 @@ module.exports = CoffeeAssets = (function() {
     o = o || {};
     o.render_options = o.render_options || {};
     return function(file, type, code, done) {
-      var engine, js_fn, m, mustache;
+      var data, engine, js_fn, m, mustache, _;
       try {
         switch (type) {
+          case '.json.coffee':
+            _ = function(a, b) {
+              var c, k;
+              c = {};
+              for (k in a) {
+                c[k] = a[k];
+              }
+              for (k in b) {
+                c[k] = b[k];
+              }
+              return c;
+            };
+            data = eval(CoffeeScript.compile(code, {
+              bare: true
+            }));
+            return done(null, JSON.stringify(data, null, 2));
           case '.js.coffee':
             return done(null, CoffeeScript.compile(code, {
               bare: true

@@ -53,7 +53,7 @@ module.exports = class CoffeeAssets
               cb path.relative(process.cwd(), file), relout, glob.in, glob.out
         )(in: glob.in[kk] and path.xplat(glob.in[kk]), out: glob.out and path.xplat(glob.out), suffix: glob.suffix or suffix)
 
-  write_manager: (asset_path, title, infile, outfile) => (err, compiled_output) =>
+  write_manager: (title, asset_path, infile, outfile) => (err, compiled_output) =>
     return @notify title, err, 'failure', true, true if err
     @write infile, outfile, compiled_output, asset_path, (err) =>
       return @notify title, "unable to write #{outfile}. #{err}", 'failure', true, true if err
@@ -104,33 +104,29 @@ module.exports = class CoffeeAssets
     return
 
   precompile: (file, compile, cb, lvl=0) ->
-    _this = @
     s = ''
     type = (m=file.match(/\..+$/)) isnt null and m[0]
-    @parse_directives file, (err, out) ->
+    @parse_directives file, (err, out) =>
       return cb err if err
       flow = new async()
       for k of out
         if typeof out[k] is 'string'
-          ((code) -> flow.serial ->
-            s += _this.escape_literal file, type, code
-            @()
-            return
+          ((code) => flow.serial (next) =>
+            s += @escape_literal file, type, code
+            next()
           )(out[k])
         else # object
           if out[k].directive is 'require'
-            ((file2) -> flow.serial ->
-              done = @
-              _this.precompile file2, compile, ((err, compiled) ->
+            ((file2) => flow.serial (next) =>
+              @precompile file2, compile, ((err, compiled) ->
                 return cb err if err
                 s += compiled
-                done err
-                return
+                next null
               ), lvl+1
               return
             )(path.resolve(path.dirname(file), out[k].file))
       flow.finally (err) ->
-        cb err if err
+        return cb err if err
         if lvl is 0
           compile file, type, s, cb # return compiled output
         else
@@ -143,7 +139,7 @@ module.exports = class CoffeeAssets
     div = (new Array((80/2)-3)).join('-=')+'-'
     file = path.relative process.cwd(), file
     switch type
-      when '.js.coffee'
+      when '.js.coffee', '.json.coffee'
         return "\n"+code # as-is in CoffeeScript
       when '.js'
         return "\n"+code.replace(/\`/g, '\\`')+"\n" # escaped in CoffeeScript
@@ -159,6 +155,11 @@ module.exports = class CoffeeAssets
     (file, type, code, done) =>
       try
         switch type
+          when '.json.coffee'
+            # helpers
+            _=(a,b)->c={};c[k]=a[k]for k of a;c[k]=b[k]for k of b;c # merge
+            data = eval CoffeeScript.compile code, bare: true
+            done null, JSON.stringify data, null, 2
           when '.js.coffee'
             done null, CoffeeScript.compile code, bare: true
           when '.html.coffee'
