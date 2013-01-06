@@ -74,7 +74,7 @@ module.exports = CoffeeAssets = (function() {
     var a, cb, glob, globs, k, kk, suffix, title, _results;
     a = arguments;
     cb = a[a.length - 1];
-    if (a.length === 2) {
+    if (a.length === 3) {
       globs = [
         {
           "in": [''],
@@ -127,10 +127,23 @@ module.exports = CoffeeAssets = (function() {
   CoffeeAssets.prototype.common_compiler = function(compiler_options) {
     var _this = this;
     return function(o) {
+      var a, count;
       o.outfile = o.outfile.replace(/\.coffee$/, '');
+      if ((a = async.q[o.title]) && a.beginning_length > 0 && (count = a.beginning_length - a.processed) > 0) {
+        _this.notify(o.title, "will compile " + o.outfile + " after " + count + " task(s) complete", 'pending', false, true);
+      }
       return async.push(o.title, function(next) {
-        o.cb = next;
-        _this.notify(o.title, "compiling " + o.outfile, 'pending', false, true);
+        var wrote;
+        wrote = false;
+        o.cb = function() {
+          wrote = true;
+          return next.apply(null, arguments);
+        };
+        async.delay(500, function() {
+          if (!wrote) {
+            return _this.notify(o.title, "still compiling " + o.outfile + "...", 'pending', false, true);
+          }
+        });
         return _this.precompile(o.infile, _this.compiler(compiler_options), _this.write_manager(o));
       });
     };
@@ -167,8 +180,9 @@ module.exports = CoffeeAssets = (function() {
 
   CoffeeAssets.prototype.restart_node = function() {
     if (this.node_child) {
-      return this.node_child.kill();
+      this.node_child.kill('SIGHUP');
     }
+    return this.notify('node', 'sent SIGHUP to node child process', 'pending', false, false);
   };
 
   CoffeeAssets.prototype.start_node = function() {
@@ -185,10 +199,12 @@ module.exports = CoffeeAssets = (function() {
     this.node_child.on('exit', function(code) {
       var uptime;
       uptime = new Date() - last_start;
-      _this.notify('node', "node server died (uptime: " + (uptime / 1000) + "sec)", 'pending', false, false);
+      _this.notify('node', "node server exit with code " + (code || 0) + " (uptime: " + (uptime / 1000) + "sec)", 'pending', false, false);
       if (uptime < 2 * 1000) {
-        _this.notify('node', 'due to short uptime, 15sec to restart...', 'pending', false, false);
-        return setTimeout(_this.start_node, 15 * 1000);
+        _this.notify('node', 'short uptime; waiting 3sec to prevent bouncing...', 'pending', false, false);
+        return async.delay(3 * 1000, function() {
+          return _this.start_node;
+        });
       } else {
         return _this.start_node();
       }

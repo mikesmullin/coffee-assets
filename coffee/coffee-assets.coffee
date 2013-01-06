@@ -40,10 +40,10 @@ module.exports = class CoffeeAssets
   watch: ->
     a = arguments
     cb = a[a.length-1]
-    if a.length is 2
+    if a.length is 3
       globs = [ in: [''], out: '' ]
       [title, suffix] = a
-    else if a.length is  4
+    else if a.length is 4
       [title, globs, suffix] = a
     for k, glob of globs
       glob.in = [ glob.in ] if typeof glob.in is 'string'
@@ -63,9 +63,15 @@ module.exports = class CoffeeAssets
 
   common_compiler: (compiler_options) -> (o) =>
     o.outfile = o.outfile.replace(/\.coffee$/, '')
+    if (a = async.q[o.title]) and # the queue exists
+      a.beginning_length > 0 and # has tasks in it
+      (count = a.beginning_length - a.processed) > 0 # and tasks are still processing
+        @notify o.title, "will compile #{o.outfile} after #{count} task(s) complete", 'pending', false, true
     async.push o.title, (next) =>
-      o.cb = next
-      @notify o.title, "compiling #{o.outfile}", 'pending', false, true
+      wrote = false
+      o.cb = -> wrote = true; next.apply null, arguments
+      async.delay 500, => if not wrote
+        @notify o.title, "still compiling #{o.outfile}...", 'pending', false, true
       @precompile o.infile, @compiler(compiler_options), @write_manager o
 
   write_manager: (o) -> (err, compiled_output) =>
@@ -84,7 +90,8 @@ module.exports = class CoffeeAssets
       cb null
 
   restart_node: ->
-    @node_child.kill() if @node_child
+    @node_child.kill 'SIGHUP' if @node_child
+    @notify 'node', 'sent SIGHUP to node child process', 'pending', false, false
 
   start_node: ->
     last_start = new Date()
@@ -95,10 +102,10 @@ module.exports = class CoffeeAssets
       @notify 'node', ''+stderr, 'failure', true, false
     @node_child.on 'exit', (code) =>
       uptime = (new Date()-last_start)
-      @notify 'node', "node server died (uptime: #{uptime/1000}sec)", 'pending', false, false
+      @notify 'node', "node server exit with code #{code or 0} (uptime: #{uptime/1000}sec)", 'pending', false, false
       if uptime < 2*1000
-        @notify 'node', 'due to short uptime, 15sec to restart...', 'pending', false, false
-        setTimeout @start_node, 15*1000
+        @notify 'node', 'short uptime; waiting 3sec to prevent bouncing...', 'pending', false, false
+        async.delay 3*1000, => @start_node
       else
         @start_node()
     @notify 'node', 'spawned new server instance', 'pending', false, false
