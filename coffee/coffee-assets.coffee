@@ -46,16 +46,16 @@ module.exports = class CoffeeAssets
       for kk of glob.in
         ((glob) =>
           @notify 'gaze', "watching #{glob.in+glob.suffix}", 'pending', false, false
-          gaze glob.in+glob.suffix, (err, watcher) =>
+          gaze path.join(process.cwd(), glob.in+glob.suffix), (err, watcher) =>
             @notify 'gaze', err, 'failure', true, false if err
             ` this`.on 'changed', (file) ->
               relout = path.join glob.out, path.relative path.join(process.cwd(), glob.in), file
               cb path.relative(process.cwd(), file), relout, glob.in, glob.out
         )(in: glob.in[kk] and path.xplat(glob.in[kk]), out: glob.out and path.xplat(glob.out), suffix: glob.suffix or suffix)
 
-  write_manager: (title, infile, outfile) => (err, compiled_output) =>
+  write_manager: (asset_path, title, infile, outfile) => (err, compiled_output) =>
     return @notify title, err, 'failure', true, true if err
-    assets.write infile, outfile, compiled_output, asset_path, (err) =>
+    @write infile, outfile, compiled_output, asset_path, (err) =>
       return @notify title, "unable to write #{outfile}. #{err}", 'failure', true, true if err
       @notify title, "wrote #{outfile}", 'success', false, true
 

@@ -96,7 +96,7 @@ module.exports = CoffeeAssets = (function() {
         for (kk in glob["in"]) {
           _results1.push((function(glob) {
             _this.notify('gaze', "watching " + (glob["in"] + glob.suffix), 'pending', false, false);
-            return gaze(glob["in"] + glob.suffix, function(err, watcher) {
+            return gaze(path.join(process.cwd(), glob["in"] + glob.suffix), function(err, watcher) {
               if (err) {
                 _this.notify('gaze', err, 'failure', true, false);
               }
@@ -118,13 +118,13 @@ module.exports = CoffeeAssets = (function() {
     return _results;
   };
 
-  CoffeeAssets.prototype.write_manager = function(title, infile, outfile) {
+  CoffeeAssets.prototype.write_manager = function(asset_path, title, infile, outfile) {
     var _this = this;
     return function(err, compiled_output) {
       if (err) {
         return _this.notify(title, err, 'failure', true, true);
       }
-      return assets.write(infile, outfile, compiled_output, asset_path, function(err) {
+      return _this.write(infile, outfile, compiled_output, asset_path, function(err) {
         if (err) {
           return _this.notify(title, "unable to write " + outfile + ". " + err, 'failure', true, true);
         }
