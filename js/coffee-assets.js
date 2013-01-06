@@ -53,6 +53,7 @@ module.exports = CoffeeAssets = (function() {
   CoffeeAssets.require_fresh = require_fresh;
 
   CoffeeAssets.prototype.notify = function(title, msg, image, err, show) {
+    var prefix;
     if (typeof this._titles[title] === 'undefined') {
       this._titles[title] = this._color_index++;
     }
@@ -66,7 +67,8 @@ module.exports = CoffeeAssets = (function() {
       });
     }
     msg = ('' + msg).replace(/[\r\n]+$/, '');
-    console.log("" + this.colors[this._titles[title]] + title + ":\u001b[0m " + msg);
+    prefix = "" + this.colors[this._titles[title]] + title + ":\u001b[0m ";
+    console.log("" + prefix + (msg.replace(/\n/g, "\n" + prefix)));
     return "" + title + ": " + msg;
   };
 

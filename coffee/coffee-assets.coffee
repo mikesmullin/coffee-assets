@@ -34,7 +34,8 @@ module.exports = class CoffeeAssets
     msg = msg.stack if err and typeof msg is 'object' and typeof msg.stack isnt 'undefined'
     growl msg, image: path.xplat(__dirname, "/../images/#{image}.png"), title: title if show
     msg = (''+msg).replace(/[\r\n]+$/, '')
-    console.log "#{@colors[@_titles[title]]}#{title}:\u001b[0m #{msg}"
+    prefix = "#{@colors[@_titles[title]]}#{title}:\u001b[0m "
+    console.log "#{prefix}#{msg.replace(/\n/g, "\n#{prefix}")}"
     "#{title}: #{msg}"
 
   watch: ->
