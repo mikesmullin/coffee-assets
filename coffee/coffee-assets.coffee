@@ -40,7 +40,7 @@ module.exports = class CoffeeAssets
   watch: ->
     a = arguments
     cb = a[a.length-1]
-    if a.length is 3
+    if a.length is 2
       globs = [ in: [''], out: '' ]
       [title, suffix] = a
     else if a.length is  4
@@ -53,24 +53,26 @@ module.exports = class CoffeeAssets
           gaze path.join(process.cwd(), glob.in+glob.suffix), (err, watcher) =>
             @notify 'gaze', err, 'failure', true, false if err
             ` this`.on 'changed', (file) ->
-              async.push title, (next) -> cb
+              cb
                 title: title
                 infile: path.relative process.cwd(), file
                 outfile: path.join glob.out, path.relative path.join(process.cwd(), glob.in), file
                 inpath: glob.in
                 outpath: glob.out
-                cb: next
         )(in: glob.in[kk] and path.xplat(glob.in[kk]), out: glob.out and path.xplat(glob.out), suffix: glob.suffix or suffix)
 
   common_compiler: (compiler_options) -> (o) =>
-    o.asset_path = o.asset_path or @o.asset_path
     o.outfile = o.outfile.replace(/\.coffee$/, '')
-    @precompile o.infile, @compiler(compiler_options), @write_manager o
+    async.push o.title, (next) =>
+      o.cb = next
+      @notify o.title, "compiling #{o.outfile}", 'pending', false, true
+      @precompile o.infile, @compiler(compiler_options), @write_manager o
 
   write_manager: (o) -> (err, compiled_output) =>
-    return o.cb @notify o.title, err, 'failure', true, true if err
-    @write o.infile, o.outfile, compiled_output, o.asset_path, (err) =>
-      return o.cb @notify o.title, "unable to write #{o.outfile}. #{err}", 'failure', true, true if err
+    o.cb = o.cb or ->
+    return o.cb null, @notify o.title, err, 'failure', true, true if err
+    @write o.infile, o.outfile, compiled_output, o.asset_path or @o.asset_path, (err) =>
+      return o.cb null, @notify o.title, "unable to write #{o.outfile}. #{err}", 'failure', true, true if err
       @notify o.title, "wrote #{o.outfile}", 'success', false, true
       o.cb null
 
@@ -96,9 +98,9 @@ module.exports = class CoffeeAssets
       @notify 'node', "node server died (uptime: #{uptime/1000}sec)", 'pending', false, false
       if uptime < 2*1000
         @notify 'node', 'due to short uptime, 15sec to restart...', 'pending', false, false
-        setTimeout start_node, 15*1000
+        setTimeout @start_node, 15*1000
       else
-        start_node()
+        @start_node()
     @notify 'node', 'spawned new server instance', 'pending', false, false
 
   parse_directives: (file, cb) ->
@@ -150,7 +152,7 @@ module.exports = class CoffeeAssets
       flow.finally (err) ->
         return cb err if err
         if lvl is 0
-          compile file, type, s, cb # return compiled output
+          compile file, type, s, cb # let compiler return output
         else
           cb null, s # return CoffeeScript
         return

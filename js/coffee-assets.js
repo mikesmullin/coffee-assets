@@ -74,7 +74,7 @@ module.exports = CoffeeAssets = (function() {
     var a, cb, glob, globs, k, kk, suffix, title, _results;
     a = arguments;
     cb = a[a.length - 1];
-    if (a.length === 3) {
+    if (a.length === 2) {
       globs = [
         {
           "in": [''],
@@ -103,15 +103,12 @@ module.exports = CoffeeAssets = (function() {
                 _this.notify('gaze', err, 'failure', true, false);
               }
               return  this.on('changed', function(file) {
-                return async.push(title, function(next) {
-                  return cb({
-                    title: title,
-                    infile: path.relative(process.cwd(), file),
-                    outfile: path.join(glob.out, path.relative(path.join(process.cwd(), glob["in"]), file)),
-                    inpath: glob["in"],
-                    outpath: glob.out,
-                    cb: next
-                  });
+                return cb({
+                  title: title,
+                  infile: path.relative(process.cwd(), file),
+                  outfile: path.join(glob.out, path.relative(path.join(process.cwd(), glob["in"]), file)),
+                  inpath: glob["in"],
+                  outpath: glob.out
                 });
               });
             });
@@ -130,21 +127,25 @@ module.exports = CoffeeAssets = (function() {
   CoffeeAssets.prototype.common_compiler = function(compiler_options) {
     var _this = this;
     return function(o) {
-      o.asset_path = o.asset_path || _this.o.asset_path;
       o.outfile = o.outfile.replace(/\.coffee$/, '');
-      return _this.precompile(o.infile, _this.compiler(compiler_options), _this.write_manager(o));
+      return async.push(o.title, function(next) {
+        o.cb = next;
+        _this.notify(o.title, "compiling " + o.outfile, 'pending', false, true);
+        return _this.precompile(o.infile, _this.compiler(compiler_options), _this.write_manager(o));
+      });
     };
   };
 
   CoffeeAssets.prototype.write_manager = function(o) {
     var _this = this;
     return function(err, compiled_output) {
+      o.cb = o.cb || function() {};
       if (err) {
-        return o.cb(_this.notify(o.title, err, 'failure', true, true));
+        return o.cb(null, _this.notify(o.title, err, 'failure', true, true));
       }
-      return _this.write(o.infile, o.outfile, compiled_output, o.asset_path, function(err) {
+      return _this.write(o.infile, o.outfile, compiled_output, o.asset_path || _this.o.asset_path, function(err) {
         if (err) {
-          return o.cb(_this.notify(o.title, "unable to write " + o.outfile + ". " + err, 'failure', true, true));
+          return o.cb(null, _this.notify(o.title, "unable to write " + o.outfile + ". " + err, 'failure', true, true));
         }
         _this.notify(o.title, "wrote " + o.outfile, 'success', false, true);
         return o.cb(null);
@@ -187,9 +188,9 @@ module.exports = CoffeeAssets = (function() {
       _this.notify('node', "node server died (uptime: " + (uptime / 1000) + "sec)", 'pending', false, false);
       if (uptime < 2 * 1000) {
         _this.notify('node', 'due to short uptime, 15sec to restart...', 'pending', false, false);
-        return setTimeout(start_node, 15 * 1000);
+        return setTimeout(_this.start_node, 15 * 1000);
       } else {
-        return start_node();
+        return _this.start_node();
       }
     });
     return this.notify('node', 'spawned new server instance', 'pending', false, false);
