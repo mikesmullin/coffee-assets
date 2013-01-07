@@ -103,14 +103,27 @@ module.exports = class CoffeeAssets
       @notify title, ''+stderr, 'failure', true, false
     child.on 'exit', (code) =>
       uptime = (new Date()-last_start)
-      @notify title, "exit with code #{code or 0} (uptime: #{uptime/1000}sec)", 'pending', false, false
+      @notify title, "exit with code #{code or 0} (uptime: #{uptime/1000}sec). will restart...", 'pending', false, false
       if uptime < 2*1000
-        @notify title, 'short uptime; waiting 3sec to prevent bouncing...', 'pending', false, false
+        @notify title, 'waiting 3sec to prevent flapping due to short uptime...', 'pending', false, false
         async.delay 3*1000, => @child_process_loop title, cmd, args
       else
         @child_process_loop title, cmd, args
     @notify title, 'spawned new instance', 'success', false, false
     return child
+
+  forward_interrupt: ->
+    process.on 'SIGINT', ->
+      # use CTRL+C to restart
+      console.log "\n\n*** Restarting ***\n"
+      # ignoring the interrupt signal
+      # allows it to flow through to
+      # child processes only
+    process.on 'SIGQUIT', ->
+      # use CTRL+\ to kill
+      console.log "\n\n*** Killing ***\n"
+      process.nextTick ->
+        process.exit 0
 
   parse_directives: (file, cb) ->
     _this = @

@@ -201,9 +201,9 @@ module.exports = CoffeeAssets = (function() {
     child.on('exit', function(code) {
       var uptime;
       uptime = new Date() - last_start;
-      _this.notify(title, "exit with code " + (code || 0) + " (uptime: " + (uptime / 1000) + "sec)", 'pending', false, false);
+      _this.notify(title, "exit with code " + (code || 0) + " (uptime: " + (uptime / 1000) + "sec). will restart...", 'pending', false, false);
       if (uptime < 2 * 1000) {
-        _this.notify(title, 'short uptime; waiting 3sec to prevent bouncing...', 'pending', false, false);
+        _this.notify(title, 'waiting 3sec to prevent flapping due to short uptime...', 'pending', false, false);
         return async.delay(3 * 1000, function() {
           return _this.child_process_loop(title, cmd, args);
         });
@@ -213,6 +213,18 @@ module.exports = CoffeeAssets = (function() {
     });
     this.notify(title, 'spawned new instance', 'success', false, false);
     return child;
+  };
+
+  CoffeeAssets.prototype.forward_interrupt = function() {
+    process.on('SIGINT', function() {
+      return console.log("\n\n*** Restarting ***\n");
+    });
+    return process.on('SIGQUIT', function() {
+      console.log("\n\n*** Killing ***\n");
+      return process.nextTick(function() {
+        return process.exit(0);
+      });
+    });
   };
 
   CoffeeAssets.prototype.parse_directives = function(file, cb) {
