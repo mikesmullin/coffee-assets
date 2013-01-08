@@ -215,35 +215,6 @@ module.exports = CoffeeAssets = (function() {
     return child;
   };
 
-  CoffeeAssets.prototype.safe_shutdown_child_processes = function(child_processes, last_child, cb) {
-    var k, p;
-    for (k in child_processes) {
-      p = child_processes[k];
-      p.removeAllListeners('exit');
-    }
-    child_processes[last_child].on('exit', function(code) {
-      return process.nextTick(function() {
-        return cb(null);
-      });
-    });
-    for (k in child_processes) {
-      p = child_processes[k];
-      p.kill('SIGINT');
-    }
-  };
-
-  CoffeeAssets.prototype.forward_interrupt = function() {
-    process.on('SIGINT', function() {
-      return console.log("\n\n*** Restarting ***\n");
-    });
-    return process.on('SIGQUIT', function() {
-      console.log("\n\n*** Killing ***\n");
-      return process.nextTick(function() {
-        return process.exit(0);
-      });
-    });
-  };
-
   CoffeeAssets.prototype.parse_directives = function(file, cb) {
     var _this;
     _this = this;

@@ -112,29 +112,6 @@ module.exports = class CoffeeAssets
     @notify title, 'spawned new instance', 'success', false, false
     return child
 
-  safe_shutdown_child_processes: (child_processes, last_child, cb) ->
-    for k, p of child_processes
-      p.removeAllListeners 'exit'
-    child_processes[last_child].on 'exit', (code) ->
-      process.nextTick ->
-        cb null
-    for k, p of child_processes
-      p.kill 'SIGINT'
-    return
-
-  forward_interrupt: ->
-    process.on 'SIGINT', ->
-      # use CTRL+C to restart
-      console.log "\n\n*** Restarting ***\n"
-      # ignoring the interrupt signal
-      # allows it to flow through to
-      # child processes only
-    process.on 'SIGQUIT', ->
-      # use CTRL+\ to kill
-      console.log "\n\n*** Killing ***\n"
-      process.nextTick ->
-        process.exit 0
-
   parse_directives: (file, cb) ->
     _this = @
     fs.exists file, (exists) ->
