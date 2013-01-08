@@ -226,31 +226,38 @@ module.exports = class CoffeeAssets
 
   # currently only used for templates
   precompile_all: (basepath, o, cb) ->
-    engine = new CoffeeTemplates o.render_options
-    templates = {}
-    walk = (basepath, cb, done) ->
-      items = fs.readdirSync basepath
-      dirs = []
-      for i, item of items
-        abspath = basepath+'/'+item
-        if fs.statSync(abspath).isDirectory()
-          dirs.push abspath
-          walk abspath, cb
-        else
-          cb abspath
-      done null if typeof done is 'function' # not specified during recursion
-      return dirs
+    last_file = ''
+    try
+      engine = new CoffeeTemplates o.render_options
+      templates = {}
+      walk = (basepath, cb, done) ->
+        items = fs.readdirSync basepath
+        dirs = []
+        for i, item of items
+          abspath = basepath+'/'+item
+          if fs.statSync(abspath).isDirectory()
+            dirs.push abspath
+            walk abspath, cb
+          else
+            cb abspath
+        done null if typeof done is 'function' # not specified during recursion
+        return dirs
 
-    walk basepath, ((file) -> # walk the directory hierarchy
-      if file.match(/\.html\.coffee$/) isnt null
-        key = path.resolve(file).slice(path.resolve(basepath, '..').length+1, -12)
-        code = fs.readFileSync file
-        js_fn = eval '(function(){'+CoffeeScript.compile(''+code, bare: true)+'})'
-        mustache = engine.render js_fn
-        templates[key] = mustache
-    ), ->
-      js_fn = CoffeeTemplates.compileAll templates, o.compile_options
-      cb null, 'var templates='+js_fn.toString()
+      walk basepath, ((file) -> # walk the directory hierarchy
+        if file.match(/\.html\.coffee$/) isnt null
+          key = path.resolve(file).slice(path.resolve(basepath, '..').length+1, -12)
+          last_file = file
+          code = fs.readFileSync file
+          js_fn = eval '(function(){'+CoffeeScript.compile(''+code, bare: true)+'})'
+          mustache = engine.render js_fn
+          templates[key] = mustache
+      ), ->
+        js_fn = CoffeeTemplates.compileAll templates, o.compile_options
+        cb null, 'var templates='+js_fn.toString()
+    catch err
+      return cb """
+      An error occurred while processing CoffeeTemplates #{last_file}:\n
+      """+err.stack
 
   digest: ->
 

@@ -398,44 +398,50 @@ module.exports = CoffeeAssets = (function() {
   };
 
   CoffeeAssets.prototype.precompile_all = function(basepath, o, cb) {
-    var engine, templates, walk;
-    engine = new CoffeeTemplates(o.render_options);
-    templates = {};
-    walk = function(basepath, cb, done) {
-      var abspath, dirs, i, item, items;
-      items = fs.readdirSync(basepath);
-      dirs = [];
-      for (i in items) {
-        item = items[i];
-        abspath = basepath + '/' + item;
-        if (fs.statSync(abspath).isDirectory()) {
-          dirs.push(abspath);
-          walk(abspath, cb);
-        } else {
-          cb(abspath);
+    var engine, last_file, templates, walk;
+    last_file = '';
+    try {
+      engine = new CoffeeTemplates(o.render_options);
+      templates = {};
+      walk = function(basepath, cb, done) {
+        var abspath, dirs, i, item, items;
+        items = fs.readdirSync(basepath);
+        dirs = [];
+        for (i in items) {
+          item = items[i];
+          abspath = basepath + '/' + item;
+          if (fs.statSync(abspath).isDirectory()) {
+            dirs.push(abspath);
+            walk(abspath, cb);
+          } else {
+            cb(abspath);
+          }
         }
-      }
-      if (typeof done === 'function') {
-        done(null);
-      }
-      return dirs;
-    };
-    return walk(basepath, (function(file) {
-      var code, js_fn, key, mustache;
-      if (file.match(/\.html\.coffee$/) !== null) {
-        key = path.resolve(file).slice(path.resolve(basepath, '..').length + 1, -12);
-        code = fs.readFileSync(file);
-        js_fn = eval('(function(){' + CoffeeScript.compile('' + code, {
-          bare: true
-        }) + '})');
-        mustache = engine.render(js_fn);
-        return templates[key] = mustache;
-      }
-    }), function() {
-      var js_fn;
-      js_fn = CoffeeTemplates.compileAll(templates, o.compile_options);
-      return cb(null, 'var templates=' + js_fn.toString());
-    });
+        if (typeof done === 'function') {
+          done(null);
+        }
+        return dirs;
+      };
+      return walk(basepath, (function(file) {
+        var code, js_fn, key, mustache;
+        if (file.match(/\.html\.coffee$/) !== null) {
+          key = path.resolve(file).slice(path.resolve(basepath, '..').length + 1, -12);
+          last_file = file;
+          code = fs.readFileSync(file);
+          js_fn = eval('(function(){' + CoffeeScript.compile('' + code, {
+            bare: true
+          }) + '})');
+          mustache = engine.render(js_fn);
+          return templates[key] = mustache;
+        }
+      }), function() {
+        var js_fn;
+        js_fn = CoffeeTemplates.compileAll(templates, o.compile_options);
+        return cb(null, 'var templates=' + js_fn.toString());
+      });
+    } catch (err) {
+      return cb(("An error occurred while processing CoffeeTemplates " + last_file + ":\n") + err.stack);
+    }
   };
 
   CoffeeAssets.prototype.digest = function() {};
