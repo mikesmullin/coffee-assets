@@ -90,27 +90,23 @@ module.exports = class CoffeeAssets
       return cb err if err
       cb null
 
-  restart_child_process: (title, child) -> if child
-    child.kill 'SIGHUP'
-    @notify title, 'sent SIGHUP to child process', 'pending', false, false
-
-  child_process_loop: (title, cmd, args) ->
+  child_process_loop: (o, title, cmd, args) ->
     last_start = new Date()
     child = child_process.spawn cmd, args
     child.stdout.on 'data', (stdout) =>
       @notify title, ''+stdout, 'pending', false, false
     child.stderr.on 'data', (stderr) =>
-      @notify title, ''+stderr, 'failure', true, false
+      @notify title, ''+stderr, 'failure', true, true
     child.on 'exit', (code) =>
       uptime = (new Date()-last_start)
       @notify title, "exit with code #{code or 0} (uptime: #{uptime/1000}sec). will restart...", 'pending', false, false
       if uptime < 2*1000
         @notify title, 'waiting 3sec to prevent flapping due to short uptime...', 'pending', false, false
-        async.delay 3*1000, => @child_process_loop title, cmd, args
+        async.delay 3*1000, => o[title] = @child_process_loop o, title, cmd, args
       else
-        @child_process_loop title, cmd, args
+        o[title] = @child_process_loop o, title, cmd, args
     @notify title, 'spawned new instance', 'success', false, false
-    return child
+    return o[title] = child
 
   parse_directives: (file, cb) ->
     _this = @

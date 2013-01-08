@@ -180,14 +180,7 @@ module.exports = CoffeeAssets = (function() {
     });
   };
 
-  CoffeeAssets.prototype.restart_child_process = function(title, child) {
-    if (child) {
-      child.kill('SIGHUP');
-      return this.notify(title, 'sent SIGHUP to child process', 'pending', false, false);
-    }
-  };
-
-  CoffeeAssets.prototype.child_process_loop = function(title, cmd, args) {
+  CoffeeAssets.prototype.child_process_loop = function(o, title, cmd, args) {
     var child, last_start,
       _this = this;
     last_start = new Date();
@@ -196,7 +189,7 @@ module.exports = CoffeeAssets = (function() {
       return _this.notify(title, '' + stdout, 'pending', false, false);
     });
     child.stderr.on('data', function(stderr) {
-      return _this.notify(title, '' + stderr, 'failure', true, false);
+      return _this.notify(title, '' + stderr, 'failure', true, true);
     });
     child.on('exit', function(code) {
       var uptime;
@@ -205,14 +198,14 @@ module.exports = CoffeeAssets = (function() {
       if (uptime < 2 * 1000) {
         _this.notify(title, 'waiting 3sec to prevent flapping due to short uptime...', 'pending', false, false);
         return async.delay(3 * 1000, function() {
-          return _this.child_process_loop(title, cmd, args);
+          return o[title] = _this.child_process_loop(o, title, cmd, args);
         });
       } else {
-        return _this.child_process_loop(title, cmd, args);
+        return o[title] = _this.child_process_loop(o, title, cmd, args);
       }
     });
     this.notify(title, 'spawned new instance', 'success', false, false);
-    return child;
+    return o[title] = child;
   };
 
   CoffeeAssets.prototype.parse_directives = function(file, cb) {
