@@ -36,9 +36,9 @@
     "mkdirp": "*",
     "growl": "*",
     "gaze": "*",
-    "coffee-templates": "https://github.com/mikesmullin/coffee-templates/tarball/stable",
-    "coffee-stylesheets": "https://github.com/mikesmullin/coffee-stylesheets/tarball/stable",
-    "coffee-sprites": "https://github.com/mikesmullin/coffee-sprites/tarball/stable",
-    "async2": "https://github.com/mikesmullin/async2/tarball/stable"
+    "coffee-templates": "*",
+    "coffee-stylesheets": "*",
+    "coffee-sprites": "*",
+    "async2": "*"
   }
 }
