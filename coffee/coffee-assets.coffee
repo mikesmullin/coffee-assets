@@ -100,7 +100,7 @@ module.exports = class CoffeeAssets
     child.on 'exit', (code) =>
       uptime = (new Date()-last_start)
       @notify title, "exit with code #{code or 0} (uptime: #{uptime/1000}sec). will restart...", 'pending', false, false
-      if uptime < 2*1000
+      if uptime < 500
         @notify title, 'waiting 3sec to prevent flapping due to short uptime...', 'pending', false, false
         async.delay 3*1000, => o[title] = @child_process_loop o, title, cmd, args
       else
@@ -245,7 +245,7 @@ module.exports = class CoffeeAssets
 
       walk basepath, ((file) -> # walk the directory hierarchy
         if file.match(/\.html\.coffee$/) isnt null
-          key = path.resolve(file).slice(path.resolve(basepath, '..').length+1, -12)
+          key = path.resolve(file).slice(path.resolve(basepath, '.').length+1, -12)
           last_file = file
           code = fs.readFileSync file
           js_fn = eval '(function(){'+CoffeeScript.compile(''+code, bare: true)+'})'
