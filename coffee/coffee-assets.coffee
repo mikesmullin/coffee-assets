@@ -63,7 +63,12 @@ module.exports = class CoffeeAssets
         )(in: glob.in[kk] and path.xplat(glob.in[kk]), out: glob.out and path.xplat(glob.out), suffix: glob.suffix or suffix)
 
   common_compiler: (compiler_options) -> (o) =>
-    o.outfile = o.outfile.replace(/\.coffee$/, '')
+    o.outfile = o.outfile.replace `/(\.\w+)?\.coffee$/`, (ext) -> {
+      '.js.coffee':   '.js'
+      '.css.coffee':  '.css'
+      '.json.coffee': '.json'
+      '.coffee':      '.js'
+    }[ext]
     if (a = async.q[o.title]) and # the queue exists
       a.beginning_length > 0 and # has tasks in it
       (count = a.beginning_length - a.processed) > 0 # and tasks are still processing
@@ -168,7 +173,7 @@ module.exports = class CoffeeAssets
     div = (new Array((80/2)-3)).join('-=')+'-'
     file = path.relative process.cwd(), file
     switch type
-      when '.js.coffee', '.json.coffee'
+      when '.js.coffee', '.json.coffee', '.coffee'
         return "\n"+code # as-is in CoffeeScript
       when '.js'
         return "\n"+code.replace(/\`/g, '\\`')+"\n" # escaped in CoffeeScript
@@ -188,7 +193,7 @@ module.exports = class CoffeeAssets
             _=(a,b)->c={};c[k]=a[k]for k of a;c[k]=b[k]for k of b;c # merge helper
             data = eval CoffeeScript.compile code, bare: true
             done null, JSON.stringify data, null, 2
-          when '.js.coffee'
+          when '.js.coffee', '.coffee'
             done null, CoffeeScript.compile code, bare: true
           when '.html.coffee'
             js_fn = eval '(function(){'+CoffeeScript.compile(code, bare: true)+'})'

@@ -130,7 +130,14 @@ module.exports = CoffeeAssets = (function() {
     var _this = this;
     return function(o) {
       var a, count;
-      o.outfile = o.outfile.replace(/\.coffee$/, '');
+      o.outfile = o.outfile.replace(/(\.\w+)?\.coffee$/, function(ext) {
+        return {
+          '.js.coffee': '.js',
+          '.css.coffee': '.css',
+          '.json.coffee': '.json',
+          '.coffee': '.js'
+        }[ext];
+      });
       if ((a = async.q[o.title]) && a.beginning_length > 0 && (count = a.beginning_length - a.processed) > 0) {
         _this.notify(o.title, "will compile " + o.outfile + " after " + count + " task(s) complete", 'pending', false, true);
       }
@@ -306,6 +313,7 @@ module.exports = CoffeeAssets = (function() {
     switch (type) {
       case '.js.coffee':
       case '.json.coffee':
+      case '.coffee':
         return "\n" + code;
       case '.js':
         return "\n" + code.replace(/\`/g, '\\`') + "\n";
@@ -343,6 +351,7 @@ module.exports = CoffeeAssets = (function() {
             }));
             return done(null, JSON.stringify(data, null, 2));
           case '.js.coffee':
+          case '.coffee':
             return done(null, CoffeeScript.compile(code, {
               bare: true
             }));
