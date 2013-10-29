@@ -4,64 +4,27 @@ path                 = require 'path'
 path.xplat           = (b,s)->path.join.apply null,if s then [b].concat s.split '/' else b.split '/' # makes *nix paths cross-platform compatible
 require_fresh        = (a)->delete require.cache[require.resolve a];require a
 mkdirp               = require 'mkdirp'
-growl                = require 'growl'
-gaze                 = require 'gaze'
-child_process        = require 'child_process'
-async                = require 'async2'
 CoffeeScript         = require 'coffee-script'
 CoffeeTemplates      = require 'coffee-templates'
 CoffeeStylesheets    = require 'coffee-stylesheets'
 CoffeeSprites        = require 'coffee-sprites'
+CoffeeObserver       = require 'coffee-observer'
 
 module.exports = class CoffeeAssets
   constructor: (o) ->
+    @observer = new CoffeeObserver
     @sandboxes    = {}
     @manifest     = {}
-    @_titles      = {}
-    @_color_index = 0
-    @colors       = [ '\u001b[33m', '\u001b[34m', '\u001b[35m', '\u001b[36m', '\u001b[31m', '\u001b[32m', '\u001b[1m\u001b[33m', '\u001b[1m\u001b[34m', '\u001b[1m\u001b[35m', '\u001b[1m\u001b[36m', '\u001b[1m\u001b[31m', '\u001b[1m\u001b[32m' ]
-    @node_child   = null
     o = o or {}
     o.asset_path = o.asset_path or 'static/public/assets'
     @o = o
 
+  @notify: @observer.notify
+  @child_process_loop: @observer.child_process_loop
+  @watch: @observer.watch
+
   @path: path
-
   @require_fresh: require_fresh
-
-  notify: (title, msg, image, err, show) ->
-    @_titles[title] = @_color_index++ if typeof @_titles[title] is 'undefined'
-    msg = msg.stack if err and typeof msg is 'object' and typeof msg.stack isnt 'undefined'
-    growl msg, image: path.xplat(__dirname, "/../images/#{image}.png"), title: title if show
-    msg = (''+msg).replace(/[\r\n]+$/, '')
-    prefix = "#{@colors[@_titles[title]]}#{title}:\u001b[0m "
-    console.log "#{prefix}#{msg.replace(/\n/g, "\n#{prefix}")}"
-    "#{title}: #{msg}"
-
-  watch: ->
-    a = arguments
-    cb = a[a.length-1]
-    if a.length is 3
-      globs = [ in: [''], out: '' ]
-      [title, suffix] = a
-    else if a.length is 4
-      [title, globs, suffix] = a
-    for k, glob of globs
-      glob.in = [ glob.in ] if typeof glob.in is 'string'
-      for kk of glob.in
-        ((glob) =>
-          @notify 'gaze', "watching #{glob.in+glob.suffix}", 'pending', false, false
-          gaze path.join(process.cwd(), glob.in+glob.suffix), (err, watcher) =>
-            @notify 'gaze', err, 'failure', true, false if err
-            ` this`.on 'changed', (file) ->
-              cb
-                title: title
-                infile: path.relative process.cwd(), file
-                outfile: path.join glob.out, path.relative path.join(process.cwd(), glob.in), file
-                inpath: glob.in
-                outpath: glob.out
-        )(in: glob.in[kk] and path.xplat(glob.in[kk]), out: glob.out and path.xplat(glob.out), suffix: glob.suffix or suffix)
-
   common_compiler: (compiler_options) -> (o) =>
     o.outfile = o.outfile.replace(/\.coffee$/, '')
     if (a = async.q[o.title]) and # the queue exists
@@ -89,24 +52,6 @@ module.exports = class CoffeeAssets
     fs.writeFile outfile, compiled_output, 'utf8', (err) ->
       return cb err if err
       cb null
-
-  child_process_loop: (o, title, cmd, args) ->
-    last_start = new Date()
-    child = child_process.spawn cmd, args
-    child.stdout.on 'data', (stdout) =>
-      @notify title, ''+stdout, 'pending', false, false
-    child.stderr.on 'data', (stderr) =>
-      @notify title, ''+stderr, 'failure', true, true
-    child.on 'exit', (code) =>
-      uptime = (new Date()-last_start)
-      @notify title, "exit with code #{code or 0} (uptime: #{uptime/1000}sec). will restart...", 'pending', false, false
-      if uptime < 2*1000
-        @notify title, 'waiting 3sec to prevent flapping due to short uptime...', 'pending', false, false
-        async.delay 3*1000, => o[title] = @child_process_loop o, title, cmd, args
-      else
-        o[title] = @child_process_loop o, title, cmd, args
-    @notify title, 'spawned new instance', 'success', false, false
-    return o[title] = child
 
   parse_directives: (file, cb) ->
     _this = @

@@ -34,11 +34,10 @@
   "dependencies": {
     "coffee-script": "*",
     "mkdirp": "*",
-    "growl": "*",
-    "gaze": "*",
     "coffee-templates": "*",
     "coffee-stylesheets": "*",
     "coffee-sprites": "*",
+    "coffee-observer": "*",
     "async2": "*"
   }
 }
